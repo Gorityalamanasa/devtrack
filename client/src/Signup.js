@@ -1,14 +1,17 @@
 import React, { useState } from "react";
 import axios from "axios";
 
-function Signup({ setIsSignup }) {
+// 🔥 YOUR DEPLOYED BACKEND
+const BASE_URL = "https://devtrack-backend-xmag.onrender.com";
+
+function Signup({ setIsSignup, setUser, setToken }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [githubUsername, setGithubUsername] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSignup = async () => {
-    // 🔥 Basic Validation
+    // 🔥 Validation
     if (!email || !password || !githubUsername) {
       alert("All fields are required!");
       return;
@@ -17,20 +20,30 @@ function Signup({ setIsSignup }) {
     try {
       setLoading(true);
 
-      const res = await axios.post("http://localhost:5000/auth/register", {
+      const res = await axios.post(`${BASE_URL}/auth/register`, {
         email,
         password,
         githubUsername,
       });
 
-      alert("Signup successful!");
+      // ✅ If backend later returns token → ready for future
+      if (res.data.token) {
+        localStorage.setItem("token", res.data.token);
+        setToken(res.data.token);
+      }
 
-      // 👉 If you later return token from backend, you can store it:
-      // localStorage.setItem("token", res.data.token);
+      // ✅ Store user
+      if (githubUsername) {
+        localStorage.setItem("user", githubUsername);
+        setUser(githubUsername);
+      }
 
+      alert("Signup successful 🚀");
+
+      // 👉 Move to login screen
       setIsSignup(false);
     } catch (err) {
-      alert(err.response?.data?.msg || "Signup failed");
+      alert(err.response?.data?.error || "Signup failed");
     } finally {
       setLoading(false);
     }
@@ -97,7 +110,6 @@ const styles = {
     width: "340px",
     textAlign: "center",
     boxShadow: "0 15px 40px rgba(0,0,0,0.6)",
-    transition: "0.3s",
   },
   title: {
     marginBottom: "10px",
@@ -125,7 +137,6 @@ const styles = {
     cursor: "pointer",
     marginTop: "10px",
     fontWeight: "bold",
-    transition: "0.2s",
   },
   link: {
     marginTop: "15px",

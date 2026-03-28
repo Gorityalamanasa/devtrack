@@ -1,7 +1,10 @@
 import React, { useState } from "react";
 import axios from "axios";
 
-function Login({ setUser, setIsSignup }) {
+// 🔥 YOUR DEPLOYED BACKEND
+const BASE_URL = "https://devtrack-backend-xmag.onrender.com";
+
+function Login({ setUser, setIsSignup, setToken }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,22 +19,26 @@ function Login({ setUser, setIsSignup }) {
     try {
       setLoading(true);
 
-      const res = await axios.post("http://localhost:5000/auth/login", {
+      const res = await axios.post(`${BASE_URL}/auth/login`, {
         email,
         password,
       });
 
-      // 🔐 STORE TOKEN (VERY IMPORTANT)
+      // 🔐 STORE TOKEN
       if (res.data.token) {
         localStorage.setItem("token", res.data.token);
+        setToken(res.data.token); // 🔥 IMPORTANT (for App.js)
       }
 
-      // 👤 Set user (GitHub username)
-      setUser(res.data.githubUsername);
+      // 👤 STORE USER
+      if (res.data.githubUsername) {
+        localStorage.setItem("user", res.data.githubUsername);
+        setUser(res.data.githubUsername);
+      }
 
       alert("Login successful 🚀");
     } catch (err) {
-      alert(err.response?.data?.msg || "Login failed");
+      alert(err.response?.data?.error || "Login failed");
     } finally {
       setLoading(false);
     }

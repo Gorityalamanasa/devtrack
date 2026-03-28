@@ -14,14 +14,17 @@ import Signup from "./Signup";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import Compare from "./pages/Compare";
 
+// 🔥 YOUR DEPLOYED BACKEND URL
+const BASE_URL = "https://devtrack-backend-xmag.onrender.com";
+
 function App() {
   const [data, setData] = useState(null);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(localStorage.getItem("user"));
+  const [token, setToken] = useState(localStorage.getItem("token"));
   const [searchUser, setSearchUser] = useState("");
   const [activeUser, setActiveUser] = useState(null);
   const [isSignup, setIsSignup] = useState(false);
 
-  // 🧠 NEW STATE
   const [analysis, setAnalysis] = useState(null);
 
   const navigate = useNavigate();
@@ -34,31 +37,42 @@ function App() {
     return input;
   };
 
-  // 🔥 FETCH GITHUB DATA
+  // 🔥 FETCH DATA (UPDATED WITH DEPLOYED URL)
   useEffect(() => {
     if (activeUser) {
       axios
-        .get(`http://127.0.0.1:5000/github/${activeUser}`)
+        .get(`${BASE_URL}/github/${activeUser}`)
         .then((res) => setData(res.data))
         .catch((err) => console.log(err));
 
-      // 🔥 FETCH ANALYSIS ALSO
       axios
-        .get(`http://127.0.0.1:5000/analyze/${activeUser}`)
+        .get(`${BASE_URL}/analyze/${activeUser}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
         .then((res) => setAnalysis(res.data))
         .catch((err) => console.log(err));
     }
-  }, [activeUser]);
+  }, [activeUser, token]);
 
   useEffect(() => {
     if (user) setActiveUser(user);
   }, [user]);
 
+  // 🔐 LOGOUT FIX
+  const handleLogout = () => {
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+  };
+
   if (!user) {
     return isSignup ? (
-      <Signup setIsSignup={setIsSignup} />
+      <Signup setIsSignup={setIsSignup} setUser={setUser} setToken={setToken} />
     ) : (
-      <Login setUser={setUser} setIsSignup={setIsSignup} />
+      <Login setUser={setUser} setToken={setToken} setIsSignup={setIsSignup} />
     );
   }
 
@@ -82,7 +96,6 @@ function App() {
 
   return (
     <div style={styles.container}>
-      
       {/* HEADER */}
       <div style={styles.header}>
         <h1>DevTrack 🚀</h1>
@@ -92,7 +105,7 @@ function App() {
             Compare ⚔️
           </button>
 
-          <button onClick={() => setUser(null)} style={styles.logout}>
+          <button onClick={handleLogout} style={styles.logout}>
             Logout
           </button>
         </div>
@@ -146,7 +159,7 @@ function App() {
             </div>
           </div>
 
-          {/* 🧠 AI SECTION (🔥 NEW FEATURE) */}
+          {/* 🧠 AI SECTION */}
           {analysis && (
             <div style={styles.aiSection}>
               <div style={styles.dnaCard}>
@@ -255,158 +268,3 @@ function AppWrapper() {
 }
 
 export default AppWrapper;
-
-const styles = {
-  container: {
-    background: "#0f172a",
-    minHeight: "100vh",
-    color: "white",
-    padding: "20px",
-  },
-
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  headerButtons: {
-    display: "flex",
-    gap: "10px",
-  },
-
-  logout: {
-    background: "#ef4444",
-    color: "white",
-    border: "none",
-    padding: "8px 12px",
-    borderRadius: "6px",
-  },
-
-  compareBtn: {
-    background: "#22c55e",
-    color: "white",
-    border: "none",
-    padding: "8px 12px",
-    borderRadius: "6px",
-  },
-
-  searchContainer: {
-    display: "flex",
-    gap: "10px",
-    marginTop: "20px",
-  },
-
-  input: {
-    padding: "10px",
-    borderRadius: "6px",
-  },
-
-  searchBtn: {
-    background: "#00adb5",
-    border: "none",
-    color: "white",
-    padding: "10px",
-    borderRadius: "6px",
-  },
-
-  profile: {
-    display: "flex",
-    alignItems: "center",
-    gap: "15px",
-    marginTop: "30px",
-  },
-
-  avatar: {
-    width: "110px",
-    borderRadius: "50%",
-  },
-
-  cardContainer: {
-    display: "flex",
-    gap: "20px",
-    marginTop: "20px",
-  },
-
-  card: {
-    background: "#1e293b",
-    padding: "20px",
-    borderRadius: "10px",
-    width: "150px",
-    textAlign: "center",
-  },
-
-  // 🔥 AI SECTION
-  aiSection: {
-    marginTop: "30px",
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "20px",
-  },
-
-  dnaCard: {
-    background: "#1e293b",
-    padding: "20px",
-    borderRadius: "12px",
-    color: "#00adb5",
-    textAlign: "center",
-  },
-
-  weakness: {
-    background: "#1e293b",
-    padding: "20px",
-    borderRadius: "12px",
-    color: "#f87171",
-    textAlign: "center",
-  },
-
-  smartInsights: {
-    background: "#1e293b",
-    padding: "20px",
-    borderRadius: "12px",
-    color: "#facc15",
-    textAlign: "center",
-  },
-
-  chart: {
-    marginTop: "40px",
-    background: "#1e293b",
-    padding: "20px",
-    borderRadius: "12px",
-  },
-
-  repoList: {
-    marginTop: "40px",
-  },
-
-  repoCard: {
-    background: "#1e293b",
-    padding: "15px",
-    marginTop: "12px",
-    borderRadius: "10px",
-  },
-
-  repoTop: {
-    display: "flex",
-    justifyContent: "space-between",
-  },
-
-  repoMeta: {
-    color: "#94a3b8",
-    marginTop: "5px",
-  },
-
-  link: {
-    color: "#38bdf8",
-  },
-
-  skillItem: {
-    display: "flex",
-    justifyContent: "space-between",
-    background: "#1e293b",
-    padding: "10px",
-    borderRadius: "8px",
-    marginTop: "10px",
-    width: "300px",
-  },
-};

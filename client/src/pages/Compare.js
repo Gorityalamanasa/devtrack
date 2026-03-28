@@ -10,15 +10,20 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+// 🔥 DEPLOYED BACKEND URL
+const BASE_URL = "https://devtrack-backend-xmag.onrender.com";
+
 function Compare() {
   const [userA, setUserA] = useState("");
   const [userB, setUserB] = useState("");
   const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
 
+  // 🔥 Extract username from GitHub URL
   const extract = (input) => {
     if (input.includes("github.com")) {
       const parts = input.split("/");
-      return parts[parts.length - 1];
+      return parts.filter(Boolean).pop();
     }
     return input;
   };
@@ -27,13 +32,30 @@ function Compare() {
     const u1 = extract(userA.trim());
     const u2 = extract(userB.trim());
 
+    if (!u1 || !u2) {
+      alert("Please enter both usernames");
+      return;
+    }
+
     try {
+      setLoading(true);
+
+      const token = localStorage.getItem("token");
+
       const res = await axios.get(
-        `http://localhost:5000/compare/${u1}/${u2}`
+        `${BASE_URL}/compare/${u1}/${u2}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`, // 🔐 JWT ready
+          },
+        }
       );
+
       setResult(res.data);
-    } catch {
-      alert("Comparison failed");
+    } catch (err) {
+      alert("Comparison failed ❌");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -44,17 +66,19 @@ function Compare() {
       {/* INPUT */}
       <div style={styles.inputContainer}>
         <input
-          placeholder="User 1"
+          placeholder="User 1 (username or URL)"
+          value={userA}
           onChange={(e) => setUserA(e.target.value)}
           style={styles.input}
         />
         <input
-          placeholder="User 2"
+          placeholder="User 2 (username or URL)"
+          value={userB}
           onChange={(e) => setUserB(e.target.value)}
           style={styles.input}
         />
         <button style={styles.btn} onClick={handleCompare}>
-          Compare
+          {loading ? "Comparing..." : "Compare"}
         </button>
       </div>
 
@@ -142,6 +166,7 @@ const styles = {
   },
   title: {
     marginBottom: "20px",
+    fontSize: "28px",
   },
   inputContainer: {
     display: "flex",
@@ -150,43 +175,51 @@ const styles = {
     marginBottom: "30px",
   },
   input: {
-    padding: "10px",
-    borderRadius: "6px",
-    width: "200px",
+    padding: "12px",
+    borderRadius: "8px",
+    width: "220px",
+    border: "1px solid #334155",
+    background: "#1e293b",
+    color: "#fff",
   },
   btn: {
     background: "#00adb5",
     border: "none",
-    padding: "10px 15px",
+    padding: "12px 18px",
     color: "white",
-    borderRadius: "6px",
+    borderRadius: "8px",
     cursor: "pointer",
+    fontWeight: "bold",
   },
   winner: {
     color: "#22c55e",
     marginBottom: "20px",
+    fontSize: "20px",
   },
   cards: {
     display: "flex",
     justifyContent: "center",
     gap: "30px",
     marginBottom: "30px",
+    flexWrap: "wrap",
   },
   card: {
     background: "#1e293b",
     padding: "20px",
-    borderRadius: "10px",
+    borderRadius: "12px",
     width: "220px",
+    boxShadow: "0 10px 25px rgba(0,0,0,0.4)",
   },
   chartBox: {
     margin: "30px auto",
     maxWidth: "700px",
     background: "#1e293b",
     padding: "20px",
-    borderRadius: "10px",
+    borderRadius: "12px",
   },
   skills: {
     marginTop: "20px",
+    fontSize: "16px",
   },
 };
 

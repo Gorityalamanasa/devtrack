@@ -12,7 +12,7 @@ import Login from "./Login";
 import Signup from "./Signup";
 
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
-import Compare from "../pages/Compare";
+import Compare from "./pages/Compare";
 
 // 🔥 DEPLOYED BACKEND
 const BASE_URL = "https://devtrack-backend-xmag.onrender.com";
@@ -25,6 +25,7 @@ function App() {
   const [activeUser, setActiveUser] = useState(null);
   const [isSignup, setIsSignup] = useState(false);
   const [analysis, setAnalysis] = useState(null);
+  const [loading, setLoading] = useState(false); // 🔥 NEW
 
   const navigate = useNavigate();
 
@@ -36,13 +37,18 @@ function App() {
     return input;
   };
 
-  // 🔥 FETCH DATA
+  // 🔥 FETCH DATA (FIXED)
   useEffect(() => {
     if (activeUser) {
+      setLoading(true);
+
       axios
         .get(`${BASE_URL}/github/${activeUser}`)
         .then((res) => setData(res.data))
-        .catch((err) => console.log(err));
+        .catch((err) => {
+          console.error(err);
+          alert("Error fetching GitHub data (check username or rate limit)");
+        });
 
       axios
         .get(`${BASE_URL}/analyze/${activeUser}`, {
@@ -51,7 +57,8 @@ function App() {
           },
         })
         .then((res) => setAnalysis(res.data))
-        .catch((err) => console.log(err));
+        .catch((err) => console.error(err))
+        .finally(() => setLoading(false));
     }
   }, [activeUser, token]);
 
@@ -123,6 +130,9 @@ function App() {
         </button>
       </div>
 
+      {/* 🔥 LOADING */}
+      {loading && <p>Loading data...</p>}
+
       {data && (
         <>
           {/* PROFILE */}
@@ -189,7 +199,7 @@ function App() {
   );
 }
 
-/* 🔥 FIXED STYLES (THIS WAS MISSING ❗) */
+/* 🔥 STYLES */
 const styles = {
   container: {
     background: "#0f172a",

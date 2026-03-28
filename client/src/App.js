@@ -24,8 +24,11 @@ function App() {
   const [searchUser, setSearchUser] = useState("");
   const [activeUser, setActiveUser] = useState(null);
   const [isSignup, setIsSignup] = useState(false);
-
   const [analysis, setAnalysis] = useState(null);
+
+  // 🔥 NEW (loading + error)
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const navigate = useNavigate();
 
@@ -37,23 +40,30 @@ function App() {
     return input;
   };
 
-  // 🔥 FETCH DATA (UPDATED WITH DEPLOYED URL)
+  // 🔥 FETCH DATA (IMPROVED)
   useEffect(() => {
-    if (activeUser) {
-      axios
-        .get(`${BASE_URL}/github/${activeUser}`)
-        .then((res) => setData(res.data))
-        .catch((err) => console.log(err));
+    if (!activeUser) return;
 
-      axios
-        .get(`${BASE_URL}/analyze/${activeUser}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-        .then((res) => setAnalysis(res.data))
-        .catch((err) => console.log(err));
-    }
+    setLoading(true);
+    setError("");
+
+    axios
+      .get(`${BASE_URL}/github/${activeUser}`)
+      .then((res) => setData(res.data))
+      .catch((err) => {
+        console.error(err);
+        setError("❌ Failed to fetch GitHub data (check username / API limit)");
+      });
+
+    axios
+      .get(`${BASE_URL}/analyze/${activeUser}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((res) => setAnalysis(res.data))
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
   }, [activeUser, token]);
 
   useEffect(() => {
@@ -122,6 +132,12 @@ function App() {
         <button
           onClick={() => {
             const username = extractUsername(searchUser.trim());
+
+            if (!username) {
+              setError("❌ Please enter a valid username");
+              return;
+            }
+
             setActiveUser(username);
           }}
           style={styles.searchBtn}
@@ -129,6 +145,12 @@ function App() {
           Search
         </button>
       </div>
+
+      {/* 🔥 ERROR DISPLAY */}
+      {error && <p style={{ color: "red" }}>{error}</p>}
+
+      {/* 🔥 LOADING */}
+      {loading && <p>Loading data...</p>}
 
       {data && (
         <>
@@ -181,14 +203,28 @@ function App() {
             </div>
           )}
 
+          {/* 🔥 NEW: SIMPLE PROFILE SCORE (IMPACT FEATURE) */}
+          <div style={styles.card}>
+            <h3>🔥 Dev Score</h3>
+            <p>
+              {Math.round(
+                data.user.followers * 0.4 +
+                data.user.public_repos * 0.3 +
+                data.repos.reduce((a, r) => a + r.stargazers_count, 0) * 0.3
+              )}
+            </p>
+          </div>
+
           {/* CHART */}
           <div style={styles.chart}>
-            <div style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: "20px",
-              marginBottom: "10px"
-            }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                gap: "20px",
+                marginBottom: "10px",
+              }}
+            >
               <span style={{ color: "#f59e0b" }}>■ forks_count</span>
               <span style={{ color: "#00adb5" }}>■ stargazers_count</span>
             </div>
@@ -238,7 +274,12 @@ function App() {
               <div key={repo.id} style={styles.repoCard}>
                 <div style={styles.repoTop}>
                   <h4>{repo.name}</h4>
-                  <a href={repo.html_url} target="_blank" rel="noreferrer" style={styles.link}>
+                  <a
+                    href={repo.html_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={styles.link}
+                  >
                     View →
                   </a>
                 </div>
@@ -266,6 +307,7 @@ function AppWrapper() {
     </BrowserRouter>
   );
 }
+
 const styles = {
   container: {
     background: "#0f172a",

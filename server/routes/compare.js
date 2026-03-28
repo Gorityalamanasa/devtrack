@@ -7,9 +7,9 @@ const github = axios.create({
   baseURL: "https://api.github.com",
   headers: {
     Accept: "application/vnd.github+json",
-    "User-Agent": "devtrack-app", // 🔥 REQUIRED
+    "User-Agent": "devtrack-app",
     Authorization: process.env.GITHUB_TOKEN
-      ? `Bearer ${process.env.GITHUB_TOKEN}`
+      ? `token ${process.env.GITHUB_TOKEN}` // ✅ FIXED
       : undefined,
   },
 });
@@ -17,12 +17,26 @@ const github = axios.create({
 // 🔥 Skill extraction
 const getSkills = (repos) => {
   const map = {};
-  repos.forEach((r) => {
-    if (r.language) {
-      map[r.language] = (map[r.language] || 0) + 1;
+  repos.forEach((repo) => {
+    if (repo.language) {
+      map[repo.language] = (map[repo.language] || 0) + 1;
     }
   });
   return map;
+};
+
+// 🔥 Score calculation
+const calcScore = (user, repos) => {
+  const totalStars = repos.reduce(
+    (sum, repo) => sum + repo.stargazers_count,
+    0
+  );
+
+  return (
+    user.followers * 0.4 +
+    user.public_repos * 0.3 +
+    totalStars * 0.3
+  );
 };
 
 // 🔥 Compare API
@@ -30,21 +44,13 @@ router.get("/:user1/:user2", async (req, res) => {
   try {
     const { user1, user2 } = req.params;
 
+    // 🔥 Parallel API calls (fast)
     const [u1, u2, r1, r2] = await Promise.all([
       github.get(`/users/${user1}`),
       github.get(`/users/${user2}`),
       github.get(`/users/${user1}/repos`),
       github.get(`/users/${user2}/repos`),
     ]);
-
-    const calcScore = (user, repos) => {
-      const stars = repos.reduce((a, r) => a + r.stargazers_count, 0);
-      return (
-        user.followers * 0.4 +
-        user.public_repos * 0.3 +
-        stars * 0.3
-      );
-    };
 
     const score1 = calcScore(u1.data, r1.data);
     const score2 = calcScore(u2.data, r2.data);
@@ -69,9 +75,27 @@ router.get("/:user1/:user2", async (req, res) => {
       },
       winner,
     });
+
   } catch (err) {
-    console.error(err.response?.data || err.message);
-    res.status(500).json({ error: "Comparison failed" });
+    console.error("Compare API Error:", err.response?.status, err.message);
+
+    // 🔥 Handle GitHub API rate limit / forbidden
+    if (err.response?.status === 403) {
+      return res.status(403).json({
+        error: "GitHub API rate limit exceeded or access forbidden",
+      });
+    }
+
+    // 🔥 Handle user not found
+    if (err.response?.status === 404) {
+      return res.status(404).json({
+        error: "One or both GitHub users not found",
+      });
+    }
+
+    res.status(500).json({
+      error: "Comparison failed",
+    });
   }
 });
 

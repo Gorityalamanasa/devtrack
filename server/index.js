@@ -27,29 +27,53 @@ app.get("/", (req, res) => {
   res.send("DevTrack Backend Running 🚀");
 });
 
-// 🔥 GITHUB API
+// 🔥 GITHUB API (FIXED WITH TOKEN)
 app.get("/github/:username", async (req, res) => {
   try {
     const { username } = req.params;
 
-    const user = await axios.get(`https://api.github.com/users/${username}`);
-    const repos = await axios.get(`https://api.github.com/users/${username}/repos`);
+    const config = {
+      headers: {
+        Authorization: `token ${process.env.GITHUB_TOKEN}`,
+      },
+    };
+
+    const user = await axios.get(
+      `https://api.github.com/users/${username}`,
+      config
+    );
+
+    const repos = await axios.get(
+      `https://api.github.com/users/${username}/repos`,
+      config
+    );
 
     res.json({
       user: user.data,
       repos: repos.data,
     });
+
   } catch (err) {
-    res.status(500).json({ error: "Error fetching GitHub data" });
+    console.error("GitHub API Error:", err.response?.status, err.message);
+
+    if (err.response?.status === 403) {
+      return res.status(403).json({
+        error: "GitHub API rate limit exceeded or access forbidden",
+      });
+    }
+
+    res.status(500).json({
+      error: "Error fetching GitHub data",
+    });
   }
 });
 
-// 🔥 DATABASE CONNECTION (USE ENV)
+// 🔥 DATABASE CONNECTION
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB Connected"))
   .catch(err => console.log(err));
 
-// 🔥 PORT FIX (IMPORTANT FOR DEPLOYMENT)
+// 🔥 PORT (RENDER SUPPORT)
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {

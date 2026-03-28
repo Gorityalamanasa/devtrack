@@ -266,5 +266,160 @@ function AppWrapper() {
     </BrowserRouter>
   );
 }
+const styles = {
+  container: {
+    background: "#0f172a",
+    minHeight: "100vh",
+    color: "white",
+    padding: "20px",
+  },
+
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "20px",
+  },
+
+  headerButtons: {
+    display: "flex",
+    gap: "10px",
+  },
+
+  compareBtn: {
+    background: "#22c55e",
+    border: "none",
+    padding: "10px 15px",
+    borderRadius: "6px",
+    color: "white",
+    cursor: "pointer",
+  },
+
+  logout: {
+    background: "#ef4444",
+    border: "none",
+    padding: "10px 15px",
+    borderRadius: "6px",
+    color: "white",
+    cursor: "pointer",
+  },
+
+  searchContainer: {
+    display: "flex",
+    gap: "10px",
+    marginBottom: "20px",
+  },
+
+  input: {
+    padding: "10px",
+    borderRadius: "6px",
+    border: "none",
+    width: "250px",
+  },
+
+  searchBtn: {
+    background: "#00adb5",
+    border: "none",
+    padding: "10px 15px",
+    color: "white",
+    borderRadius: "6px",
+    cursor: "pointer",
+  },
+
+  profile: {
+    display: "flex",
+    alignItems: "center",
+    gap: "20px",
+    marginBottom: "20px",
+  },
+
+  avatar: {
+    width: "80px",
+    borderRadius: "50%",
+  },
+
+  cardContainer: {
+    display: "flex",
+    gap: "20px",
+    marginBottom: "30px",
+  },
+
+  card: {
+    background: "#1e293b",
+    padding: "20px",
+    borderRadius: "10px",
+    width: "150px",
+    textAlign: "center",
+  },
+
+  aiSection: {
+    display: "flex",
+    gap: "20px",
+    marginBottom: "30px",
+  },
+
+  dnaCard: {
+    flex: 1,
+    background: "#1e293b",
+    padding: "20px",
+    borderRadius: "10px",
+  },
+
+  weakness: {
+    flex: 1,
+    background: "#1e293b",
+    padding: "20px",
+    borderRadius: "10px",
+  },
+
+  smartInsights: {
+    flex: 1,
+    background: "#1e293b",
+    padding: "20px",
+    borderRadius: "10px",
+  },
+
+  chart: {
+    background: "#1e293b",
+    padding: "20px",
+    borderRadius: "10px",
+    marginBottom: "30px",
+  },
+
+  skillItem: {
+    display: "flex",
+    justifyContent: "space-between",
+    background: "#1e293b",
+    padding: "10px",
+    borderRadius: "6px",
+    marginTop: "10px",
+  },
+
+  repoList: {
+    marginTop: "30px",
+  },
+
+  repoCard: {
+    background: "#1e293b",
+    padding: "15px",
+    borderRadius: "8px",
+    marginTop: "10px",
+  },
+
+  repoTop: {
+    display: "flex",
+    justifyContent: "space-between",
+  },
+
+  repoMeta: {
+    color: "#94a3b8",
+    fontSize: "14px",
+  },
+
+  link: {
+    color: "#38bdf8",
+    textDecoration: "none",
+  },
+};
 
 export default AppWrapper;

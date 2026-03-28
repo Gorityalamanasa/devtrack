@@ -2,6 +2,16 @@ const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 
+// 🔥 GitHub API config (VERY IMPORTANT)
+const github = axios.create({
+  baseURL: "https://api.github.com",
+  headers: {
+    Accept: "application/vnd.github+json",
+    // OPTIONAL (recommended to avoid 403)
+    Authorization: `Bearer ${process.env.GITHUB_TOKEN || ""}`,
+  },
+});
+
 // 🔥 Skill extraction
 const getSkills = (repos) => {
   const map = {};
@@ -13,25 +23,20 @@ const getSkills = (repos) => {
   return map;
 };
 
-// 🔥 Compare API
 router.get("/:user1/:user2", async (req, res) => {
   try {
     const { user1, user2 } = req.params;
 
     const [u1, u2, r1, r2] = await Promise.all([
-      axios.get(`https://api.github.com/users/${user1}`),
-      axios.get(`https://api.github.com/users/${user2}`),
-      axios.get(`https://api.github.com/users/${user1}/repos`),
-      axios.get(`https://api.github.com/users/${user2}/repos`),
+      github.get(`/users/${user1}`),
+      github.get(`/users/${user2}`),
+      github.get(`/users/${user1}/repos`),
+      github.get(`/users/${user2}/repos`),
     ]);
 
     const calcScore = (user, repos) => {
       const stars = repos.reduce((a, r) => a + r.stargazers_count, 0);
-      return (
-        user.followers * 0.4 +
-        user.public_repos * 0.3 +
-        stars * 0.3
-      );
+      return user.followers * 0.4 + user.public_repos * 0.3 + stars * 0.3;
     };
 
     const score1 = calcScore(u1.data, r1.data);
@@ -58,7 +63,7 @@ router.get("/:user1/:user2", async (req, res) => {
       winner,
     });
   } catch (err) {
-    console.error(err);
+    console.error(err.response?.data || err.message);
     res.status(500).json({ error: "Comparison failed" });
   }
 });

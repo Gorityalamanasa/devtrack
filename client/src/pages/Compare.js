@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import {
   BarChart,
@@ -6,221 +6,265 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
+import Login from "./Login";
+import Signup from "./Signup";
 
-// 🔥 DEPLOYED BACKEND URL
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
+import Compare from "./pages/Compare";
+
+// 🔥 DEPLOYED BACKEND
 const BASE_URL = "https://devtrack-backend-xmag.onrender.com";
 
-function Compare() {
-  const [userA, setUserA] = useState("");
-  const [userB, setUserB] = useState("");
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
+function App() {
+  const [data, setData] = useState(null);
+  const [user, setUser] = useState(localStorage.getItem("user"));
+  const [token, setToken] = useState(localStorage.getItem("token"));
+  const [searchUser, setSearchUser] = useState("");
+  const [activeUser, setActiveUser] = useState(null);
+  const [isSignup, setIsSignup] = useState(false);
+  const [analysis, setAnalysis] = useState(null);
 
-  // 🔥 Extract username from GitHub URL
-  const extract = (input) => {
+  const navigate = useNavigate();
+
+  const extractUsername = (input) => {
     if (input.includes("github.com")) {
       const parts = input.split("/");
-      return parts.filter(Boolean).pop();
+      return parts[parts.length - 1] || parts[parts.length - 2];
     }
     return input;
   };
 
-  const handleCompare = async () => {
-    const u1 = extract(userA.trim());
-    const u2 = extract(userB.trim());
+  // 🔥 FETCH DATA
+  useEffect(() => {
+    if (activeUser) {
+      axios
+        .get(`${BASE_URL}/github/${activeUser}`)
+        .then((res) => setData(res.data))
+        .catch((err) => console.log(err));
 
-    if (!u1 || !u2) {
-      alert("Please enter both usernames");
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const token = localStorage.getItem("token");
-
-      const res = await axios.get(
-        `${BASE_URL}/compare/${u1}/${u2}`,
-        {
+      axios
+        .get(`${BASE_URL}/analyze/${activeUser}`, {
           headers: {
-            Authorization: `Bearer ${token}`, // 🔐 JWT ready
+            Authorization: `Bearer ${token}`,
           },
-        }
-      );
-
-      setResult(res.data);
-    } catch (err) {
-      alert("Comparison failed ❌");
-    } finally {
-      setLoading(false);
+        })
+        .then((res) => setAnalysis(res.data))
+        .catch((err) => console.log(err));
     }
+  }, [activeUser, token]);
+
+  useEffect(() => {
+    if (user) setActiveUser(user);
+  }, [user]);
+
+  const handleLogout = () => {
+    setUser(null);
+    setToken(null);
+    localStorage.clear();
+  };
+
+  if (!user) {
+    return isSignup ? (
+      <Signup setIsSignup={setIsSignup} setUser={setUser} setToken={setToken} />
+    ) : (
+      <Login setUser={setUser} setToken={setToken} setIsSignup={setIsSignup} />
+    );
+  }
+
+  const getSkills = () => {
+    if (!data || !data.repos) return [];
+
+    const map = {};
+    data.repos.forEach((r) => {
+      if (r.language) map[r.language] = (map[r.language] || 0) + 1;
+    });
+
+    const total = Object.values(map).reduce((a, b) => a + b, 0);
+
+    return Object.keys(map)
+      .map((k) => ({
+        name: k,
+        percent: ((map[k] / total) * 100).toFixed(1),
+      }))
+      .sort((a, b) => b.percent - a.percent);
   };
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>Compare Developers ⚔️</h1>
+      {/* HEADER */}
+      <div style={styles.header}>
+        <h1>DevTrack 🚀</h1>
 
-      {/* INPUT */}
-      <div style={styles.inputContainer}>
+        <div>
+          <button onClick={() => navigate("/compare")} style={styles.btn}>
+            Compare ⚔️
+          </button>
+          <button onClick={handleLogout} style={styles.logout}>
+            Logout
+          </button>
+        </div>
+      </div>
+
+      {/* SEARCH */}
+      <div style={styles.searchBox}>
         <input
-          placeholder="User 1 (username or URL)"
-          value={userA}
-          onChange={(e) => setUserA(e.target.value)}
+          placeholder="Enter GitHub username"
+          value={searchUser}
+          onChange={(e) => setSearchUser(e.target.value)}
           style={styles.input}
         />
-        <input
-          placeholder="User 2 (username or URL)"
-          value={userB}
-          onChange={(e) => setUserB(e.target.value)}
-          style={styles.input}
-        />
-        <button style={styles.btn} onClick={handleCompare}>
-          {loading ? "Comparing..." : "Compare"}
+        <button
+          style={styles.btn}
+          onClick={() => setActiveUser(extractUsername(searchUser))}
+        >
+          Search
         </button>
       </div>
 
-      {result && (
+      {data && (
         <>
-          {/* WINNER */}
-          <h2 style={styles.winner}>
-            🏆 Winner: {result.winner}
-          </h2>
-
-          {/* CARDS */}
-          <div style={styles.cards}>
-            <div style={styles.card}>
-              <h3>{result.user1.username}</h3>
-              <p>Followers: {result.user1.followers}</p>
-              <p>Repos: {result.user1.repos}</p>
-              <p>Score: {result.user1.score.toFixed(2)}</p>
-            </div>
-
-            <div style={styles.card}>
-              <h3>{result.user2.username}</h3>
-              <p>Followers: {result.user2.followers}</p>
-              <p>Repos: {result.user2.repos}</p>
-              <p>Score: {result.user2.score.toFixed(2)}</p>
+          {/* PROFILE */}
+          <div style={styles.profile}>
+            <img src={data.user.avatar_url} style={styles.avatar} alt="" />
+            <div>
+              <h2>{data.user.name || data.user.login}</h2>
+              <p>@{data.user.login}</p>
             </div>
           </div>
 
-          {/* GRAPH */}
-          <div style={styles.chartBox}>
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart
-                data={[
-                  {
-                    name: "Followers",
-                    A: result.user1.followers,
-                    B: result.user2.followers,
-                  },
-                  {
-                    name: "Repos",
-                    A: result.user1.repos,
-                    B: result.user2.repos,
-                  },
-                  {
-                    name: "Score",
-                    A: result.user1.score,
-                    B: result.user2.score,
-                  },
-                ]}
-              >
+          {/* CARDS */}
+          <div style={styles.cards}>
+            <div style={styles.card}>Followers: {data.user.followers}</div>
+            <div style={styles.card}>Repos: {data.user.public_repos}</div>
+            <div style={styles.card}>Following: {data.user.following}</div>
+          </div>
+
+          {/* AI */}
+          {analysis && (
+            <div style={styles.aiBox}>
+              <div style={styles.card}>
+                <h3>🧠 DNA</h3>
+                <p>{analysis.dna}</p>
+              </div>
+
+              <div style={styles.card}>
+                <h3>⚠️ Weakness</h3>
+                <p>{analysis.weakness}</p>
+              </div>
+
+              <div style={styles.card}>
+                <h3>📈 Insights</h3>
+                {analysis.insights.map((i, idx) => (
+                  <p key={idx}>{i}</p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* CHART */}
+          <div style={styles.chart}>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={data.repos.slice(0, 5)}>
                 <XAxis dataKey="name" stroke="#fff" />
                 <YAxis stroke="#fff" />
                 <Tooltip />
-                <Legend />
-                <Bar dataKey="A" fill="#00adb5" />
-                <Bar dataKey="B" fill="#f59e0b" />
+                <Bar dataKey="stargazers_count" fill="#00adb5" />
+                <Bar dataKey="forks_count" fill="#f59e0b" />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
           {/* SKILLS */}
-          <div style={styles.skills}>
-            <h3>🧠 Skills Comparison</h3>
-            <p>
-              <strong>{result.user1.username}:</strong>{" "}
-              {Object.keys(result.user1.skills).join(", ")}
-            </p>
-            <p>
-              <strong>{result.user2.username}:</strong>{" "}
-              {Object.keys(result.user2.skills).join(", ")}
-            </p>
-          </div>
+          <h2>Top Skills</h2>
+          {getSkills().map((s, i) => (
+            <div key={i} style={styles.skill}>
+              {s.name} — {s.percent}%
+            </div>
+          ))}
         </>
       )}
     </div>
   );
 }
 
+/* 🔥 FIXED STYLES (THIS WAS MISSING ❗) */
 const styles = {
   container: {
     background: "#0f172a",
     minHeight: "100vh",
     color: "white",
-    padding: "40px",
-    textAlign: "center",
+    padding: "20px",
   },
-  title: {
-    marginBottom: "20px",
-    fontSize: "28px",
-  },
-  inputContainer: {
+  header: {
     display: "flex",
-    justifyContent: "center",
-    gap: "10px",
-    marginBottom: "30px",
+    justifyContent: "space-between",
+    marginBottom: "20px",
   },
   input: {
-    padding: "12px",
-    borderRadius: "8px",
-    width: "220px",
-    border: "1px solid #334155",
-    background: "#1e293b",
-    color: "#fff",
+    padding: "10px",
+    borderRadius: "6px",
+    marginRight: "10px",
   },
   btn: {
+    padding: "10px",
     background: "#00adb5",
-    border: "none",
-    padding: "12px 18px",
     color: "white",
-    borderRadius: "8px",
+    border: "none",
+    borderRadius: "6px",
     cursor: "pointer",
-    fontWeight: "bold",
+    marginRight: "10px",
   },
-  winner: {
-    color: "#22c55e",
-    marginBottom: "20px",
-    fontSize: "20px",
+  logout: {
+    padding: "10px",
+    background: "#ef4444",
+    color: "white",
+    border: "none",
+    borderRadius: "6px",
+    cursor: "pointer",
+  },
+  profile: {
+    display: "flex",
+    alignItems: "center",
+    gap: "20px",
+  },
+  avatar: {
+    width: "80px",
+    borderRadius: "50%",
   },
   cards: {
     display: "flex",
-    justifyContent: "center",
-    gap: "30px",
-    marginBottom: "30px",
-    flexWrap: "wrap",
+    gap: "20px",
+    marginTop: "20px",
   },
   card: {
     background: "#1e293b",
-    padding: "20px",
-    borderRadius: "12px",
-    width: "220px",
-    boxShadow: "0 10px 25px rgba(0,0,0,0.4)",
+    padding: "15px",
+    borderRadius: "10px",
   },
-  chartBox: {
-    margin: "30px auto",
-    maxWidth: "700px",
-    background: "#1e293b",
-    padding: "20px",
-    borderRadius: "12px",
-  },
-  skills: {
+  aiBox: {
+    display: "flex",
+    gap: "20px",
     marginTop: "20px",
-    fontSize: "16px",
+  },
+  chart: {
+    marginTop: "30px",
+  },
+  skill: {
+    marginTop: "10px",
   },
 };
 
-export default Compare;
+function AppWrapper() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<App />} />
+        <Route path="/compare" element={<Compare />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default AppWrapper;

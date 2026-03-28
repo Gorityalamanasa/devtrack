@@ -2,6 +2,18 @@ const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 
+// 🔥 GitHub API CONFIG (FIX 403 ERROR)
+const github = axios.create({
+  baseURL: "https://api.github.com",
+  headers: {
+    Accept: "application/vnd.github+json",
+    "User-Agent": "devtrack-app", // 🔥 REQUIRED
+    Authorization: process.env.GITHUB_TOKEN
+      ? `Bearer ${process.env.GITHUB_TOKEN}`
+      : undefined,
+  },
+});
+
 // 🔥 Skill extraction
 const getSkills = (repos) => {
   const map = {};
@@ -19,10 +31,10 @@ router.get("/:user1/:user2", async (req, res) => {
     const { user1, user2 } = req.params;
 
     const [u1, u2, r1, r2] = await Promise.all([
-      axios.get(`https://api.github.com/users/${user1}`),
-      axios.get(`https://api.github.com/users/${user2}`),
-      axios.get(`https://api.github.com/users/${user1}/repos`),
-      axios.get(`https://api.github.com/users/${user2}/repos`),
+      github.get(`/users/${user1}`),
+      github.get(`/users/${user2}`),
+      github.get(`/users/${user1}/repos`),
+      github.get(`/users/${user2}/repos`),
     ]);
 
     const calcScore = (user, repos) => {
@@ -58,7 +70,7 @@ router.get("/:user1/:user2", async (req, res) => {
       winner,
     });
   } catch (err) {
-    console.error(err);
+    console.error(err.response?.data || err.message);
     res.status(500).json({ error: "Comparison failed" });
   }
 });

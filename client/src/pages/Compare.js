@@ -12,7 +12,7 @@ import Login from "../Login";
 import Signup from "../Signup";
 
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
-//import Compare from "./pages/Compare";
+
 
 // 🔥 DEPLOYED BACKEND
 const BASE_URL = "https://devtrack-backend-xmag.onrender.com";
@@ -271,7 +271,7 @@ function AppWrapper() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<App />} />
-        <Route path="/compare" element={<Compare />} />
+        
       </Routes>
     </BrowserRouter>
   );

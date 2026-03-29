@@ -14,21 +14,42 @@ const BASE_URL = "https://devtrack-backend-xmag.onrender.com";
 function Compare() {
   const [input, setInput] = useState("");
   const [data, setData] = useState([]);
+  const [insight, setInsight] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleCompare = async () => {
-    const users = input.split(",").map((u) => u.trim());
+    const users = input
+      .split(",")
+      .map((u) => u.trim())
+      .filter(Boolean);
 
-    const res = await axios.post(`${BASE_URL}/compare`, { users });
-    setData(res.data.leaderboard);
+    if (users.length < 2) {
+      alert("Enter at least 2 usernames");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const res = await axios.post(`${BASE_URL}/compare`, { users });
+
+      setData(res.data.leaderboard);
+      setInsight(res.data.insight);
+    } catch (err) {
+      console.error(err);
+      alert("Error comparing users");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // 🔥 Score Chart
+  // 🔥 SCORE CHART
   const scoreChart = data.map((u) => ({
     name: u.username,
     score: Math.round(u.score),
   }));
 
-  // 🔥 Skill Chart (top 3 users only)
+  // 🔥 SKILL CHART (top 3 users)
   const skillChart = Object.keys(data[0]?.skills || {}).map((lang) => {
     const obj = { language: lang };
     data.slice(0, 3).forEach((u) => {
@@ -37,45 +58,29 @@ function Compare() {
     return obj;
   });
 
-  // 🔥 AI Insight
-  const getInsight = () => {
-    if (!data.length) return "";
-
-    const top = data[0];
-    const second = data[1];
-
-    let msg = `🏆 ${top.username} leads because:\n`;
-
-    if (top.followers > second.followers)
-      msg += "• Strong community (followers)\n";
-
-    if (top.breakdown.totalStars > second.breakdown.totalStars)
-      msg += "• High repo impact (stars)\n";
-
-    if (top.repos > second.repos)
-      msg += "• More active development\n";
-
-    return msg;
-  };
-
   return (
     <div style={styles.container}>
       <h1>🔥 Developer Battle Arena</h1>
 
-      <input
-        placeholder="Enter users (comma separated)"
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        style={styles.input}
-      />
+      {/* INPUT */}
+      <div style={styles.inputBox}>
+        <input
+          placeholder="Enter usernames (comma separated)"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          style={styles.input}
+        />
 
-      <button onClick={handleCompare} style={styles.btn}>
-        Compare 🚀
-      </button>
+        <button onClick={handleCompare} style={styles.btn}>
+          Compare 🚀
+        </button>
+      </div>
 
-      {/* 🔥 SCORE CHART */}
+      {loading && <p>Loading...</p>}
+
       {data.length > 0 && (
         <>
+          {/* 📊 SCORE CHART */}
           <h2>📊 Score Comparison</h2>
           <div style={{ height: 300 }}>
             <ResponsiveContainer>
@@ -90,21 +95,37 @@ function Compare() {
 
           {/* 🏆 LEADERBOARD */}
           <h2>🏆 Leaderboard</h2>
+
           {data.map((u, i) => (
             <div key={i} style={styles.card}>
               <h3>
                 #{i + 1} {u.username}
               </h3>
-              <p>Score: {Math.round(u.score)}</p>
+
+              <p>🔥 Score: {Math.round(u.score)}</p>
 
               {/* 🔥 BREAKDOWN */}
-              <p>Followers: {u.followers}</p>
-              <p>Repos: {u.repos}</p>
-              <p>Stars: {u.breakdown.totalStars}</p>
+              <div style={styles.breakdown}>
+                <p>
+                  Followers Score:{" "}
+                  {u.breakdown.followersScore.toFixed(1)}
+                </p>
+                <p>
+                  Repo Quality:{" "}
+                  {u.breakdown.repoQuality.toFixed(1)}
+                </p>
+                <p>Activity Score: {u.breakdown.activity}</p>
+              </div>
+
+              {/* 👨‍💻 TYPE */}
+              <p style={styles.type}>Type: {u.type}</p>
+
+              {/* 🎯 HIRING */}
+              <p style={styles.hiring}>💼 {u.hiringFit}</p>
             </div>
           ))}
 
-          {/* 🔥 SKILL GRAPH */}
+          {/* 💻 SKILL COMPARISON */}
           <h2>💻 Skill Comparison</h2>
           <div style={{ height: 300 }}>
             <ResponsiveContainer>
@@ -116,7 +137,9 @@ function Compare() {
                   <Bar
                     key={idx}
                     dataKey={u.username}
-                    fill={["#22c55e", "#3b82f6", "#f59e0b"][idx]}
+                    fill={
+                      ["#22c55e", "#3b82f6", "#f59e0b"][idx]
+                    }
                   />
                 ))}
               </BarChart>
@@ -126,7 +149,7 @@ function Compare() {
           {/* 🧠 AI INSIGHT */}
           <div style={styles.insight}>
             <h3>🧠 AI Insight</h3>
-            <pre>{getInsight()}</pre>
+            <p>{insight}</p>
           </div>
         </>
       )}
@@ -134,6 +157,7 @@ function Compare() {
   );
 }
 
+/* 🔥 STYLES */
 const styles = {
   container: {
     background: "#0f172a",
@@ -141,27 +165,57 @@ const styles = {
     minHeight: "100vh",
     padding: "20px",
   },
+
+  inputBox: {
+    display: "flex",
+    gap: "10px",
+    marginBottom: "20px",
+  },
+
   input: {
     padding: "10px",
     width: "400px",
-    marginRight: "10px",
+    borderRadius: "6px",
+    border: "none",
   },
+
   btn: {
     padding: "10px",
     background: "#22c55e",
     border: "none",
     color: "white",
+    borderRadius: "6px",
+    cursor: "pointer",
   },
+
   card: {
     background: "#1e293b",
-    padding: "10px",
-    marginTop: "10px",
-    borderRadius: "6px",
-  },
-  insight: {
-    marginTop: "20px",
-    background: "#1e293b",
     padding: "15px",
+    marginTop: "15px",
+    borderRadius: "10px",
+  },
+
+  breakdown: {
+    fontSize: "13px",
+    color: "#94a3b8",
+    marginTop: "5px",
+  },
+
+  type: {
+    marginTop: "10px",
+    color: "#38bdf8",
+  },
+
+  hiring: {
+    marginTop: "5px",
+    color: "#22c55e",
+    fontWeight: "bold",
+  },
+
+  insight: {
+    marginTop: "30px",
+    background: "#1e293b",
+    padding: "20px",
     borderRadius: "10px",
   },
 };

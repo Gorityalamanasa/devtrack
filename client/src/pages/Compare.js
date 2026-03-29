@@ -1,199 +1,104 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import axios from "axios";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
-import Login from "../Login";
-import Signup from "../Signup";
+import { useNavigate } from "react-router-dom";
 
-import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
-
-
-// 🔥 DEPLOYED BACKEND
+// 🔥 BACKEND URL
 const BASE_URL = "https://devtrack-backend-xmag.onrender.com";
 
-function App() {
-  const [data, setData] = useState(null);
-  const [user, setUser] = useState(localStorage.getItem("user"));
-  const [token, setToken] = useState(localStorage.getItem("token"));
-  const [searchUser, setSearchUser] = useState("");
-  const [activeUser, setActiveUser] = useState(null);
-  const [isSignup, setIsSignup] = useState(false);
-  const [analysis, setAnalysis] = useState(null);
-  const [loading, setLoading] = useState(false); // 🔥 NEW
-
+function Compare() {
   const navigate = useNavigate();
 
-  const extractUsername = (input) => {
-    if (input.includes("github.com")) {
-      const parts = input.split("/");
-      return parts[parts.length - 1] || parts[parts.length - 2];
-    }
-    return input;
-  };
+  const [user1, setUser1] = useState("");
+  const [user2, setUser2] = useState("");
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  // 🔥 FETCH DATA (FIXED)
-  useEffect(() => {
-    if (activeUser) {
+  const handleCompare = async () => {
+    if (!user1 || !user2) {
+      setError("❌ Enter both usernames");
+      return;
+    }
+
+    try {
       setLoading(true);
+      setError("");
 
-      axios
-        .get(`${BASE_URL}/github/${activeUser}`)
-        .then((res) => setData(res.data))
-        .catch((err) => {
-          console.error(err);
-          alert("Error fetching GitHub data (check username or rate limit)");
-        });
+      const res = await axios.get(
+        `${BASE_URL}/compare/${user1}/${user2}`
+      );
 
-      axios
-        .get(`${BASE_URL}/analyze/${activeUser}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-        .then((res) => setAnalysis(res.data))
-        .catch((err) => console.error(err))
-        .finally(() => setLoading(false));
+      setResult(res.data);
+    } catch (err) {
+      console.error(err);
+      setError("❌ Comparison failed (check usernames)");
+    } finally {
+      setLoading(false);
     }
-  }, [activeUser, token]);
-
-  useEffect(() => {
-    if (user) setActiveUser(user);
-  }, [user]);
-
-  const handleLogout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.clear();
-  };
-
-  if (!user) {
-    return isSignup ? (
-      <Signup setIsSignup={setIsSignup} setUser={setUser} setToken={setToken} />
-    ) : (
-      <Login setUser={setUser} setToken={setToken} setIsSignup={setIsSignup} />
-    );
-  }
-
-  const getSkills = () => {
-    if (!data || !data.repos) return [];
-
-    const map = {};
-    data.repos.forEach((r) => {
-      if (r.language) map[r.language] = (map[r.language] || 0) + 1;
-    });
-
-    const total = Object.values(map).reduce((a, b) => a + b, 0);
-
-    return Object.keys(map)
-      .map((k) => ({
-        name: k,
-        percent: ((map[k] / total) * 100).toFixed(1),
-      }))
-      .sort((a, b) => b.percent - a.percent);
   };
 
   return (
     <div style={styles.container}>
       {/* HEADER */}
       <div style={styles.header}>
-        <h1>DevTrack 🚀</h1>
-
-        <div>
-          <button onClick={() => navigate("/compare")} style={styles.btn}>
-            Compare ⚔️
-          </button>
-          <button onClick={handleLogout} style={styles.logout}>
-            Logout
-          </button>
-        </div>
-      </div>
-
-      {/* SEARCH */}
-      <div style={styles.searchBox}>
-        <input
-          placeholder="Enter GitHub username"
-          value={searchUser}
-          onChange={(e) => setSearchUser(e.target.value)}
-          style={styles.input}
-        />
-        <button
-          style={styles.btn}
-          onClick={() => setActiveUser(extractUsername(searchUser))}
-        >
-          Search
+        <h1>Compare Developers ⚔️</h1>
+        <button onClick={() => navigate("/")} style={styles.backBtn}>
+          ← Back
         </button>
       </div>
 
-      {/* 🔥 LOADING */}
-      {loading && <p>Loading data...</p>}
+      {/* INPUTS */}
+      <div style={styles.inputBox}>
+        <input
+          placeholder="GitHub Username 1"
+          value={user1}
+          onChange={(e) => setUser1(e.target.value)}
+          style={styles.input}
+        />
 
-      {data && (
-        <>
-          {/* PROFILE */}
-          <div style={styles.profile}>
-            <img src={data.user.avatar_url} style={styles.avatar} alt="" />
-            <div>
-              <h2>{data.user.name || data.user.login}</h2>
-              <p>@{data.user.login}</p>
+        <input
+          placeholder="GitHub Username 2"
+          value={user2}
+          onChange={(e) => setUser2(e.target.value)}
+          style={styles.input}
+        />
+
+        <button onClick={handleCompare} style={styles.compareBtn}>
+          Compare 🚀
+        </button>
+      </div>
+
+      {/* ERROR */}
+      {error && <p style={{ color: "red" }}>{error}</p>}
+
+      {/* LOADING */}
+      {loading && <p>Comparing...</p>}
+
+      {/* RESULT */}
+      {result && (
+        <div style={styles.resultBox}>
+          {/* USERS */}
+          <div style={styles.users}>
+            <div style={styles.card}>
+              <h2>{result.user1.username}</h2>
+              <p>Followers: {result.user1.followers}</p>
+              <p>Repos: {result.user1.repos}</p>
+              <p>Score: {Math.round(result.user1.score)}</p>
+            </div>
+
+            <div style={styles.card}>
+              <h2>{result.user2.username}</h2>
+              <p>Followers: {result.user2.followers}</p>
+              <p>Repos: {result.user2.repos}</p>
+              <p>Score: {Math.round(result.user2.score)}</p>
             </div>
           </div>
 
-          {/* CARDS */}
-          <div style={styles.cards}>
-            <div style={styles.card}>Followers: {data.user.followers}</div>
-            <div style={styles.card}>Repos: {data.user.public_repos}</div>
-            <div style={styles.card}>Following: {data.user.following}</div>
+          {/* WINNER */}
+          <div style={styles.winner}>
+            🏆 Winner: <b>{result.winner}</b>
           </div>
-
-          {/* AI */}
-          {analysis && (
-            <div style={styles.aiBox}>
-              <div style={styles.card}>
-                <h3>🧠 DNA</h3>
-                <p>{analysis.dna}</p>
-              </div>
-
-              <div style={styles.card}>
-                <h3>⚠️ Weakness</h3>
-                <p>{analysis.weakness}</p>
-              </div>
-
-              <div style={styles.card}>
-                <h3>📈 Insights</h3>
-                {analysis.insights.map((i, idx) => (
-                  <p key={idx}>{i}</p>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* CHART */}
-          <div style={styles.chart}>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={data.repos.slice(0, 5)}>
-                <XAxis dataKey="name" stroke="#fff" />
-                <YAxis stroke="#fff" />
-                <Tooltip />
-                <Bar dataKey="stargazers_count" fill="#00adb5" />
-                <Bar dataKey="forks_count" fill="#f59e0b" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* SKILLS */}
-          <h2>Top Skills</h2>
-          {getSkills().map((s, i) => (
-            <div key={i} style={styles.skill}>
-              {s.name} — {s.percent}%
-            </div>
-          ))}
-        </>
+        </div>
       )}
     </div>
   );
@@ -207,74 +112,65 @@ const styles = {
     color: "white",
     padding: "20px",
   },
+
   header: {
     display: "flex",
     justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: "20px",
   },
+
+  backBtn: {
+    background: "#38bdf8",
+    border: "none",
+    padding: "10px",
+    borderRadius: "6px",
+    cursor: "pointer",
+    color: "white",
+  },
+
+  inputBox: {
+    display: "flex",
+    gap: "10px",
+    marginBottom: "20px",
+  },
+
   input: {
     padding: "10px",
     borderRadius: "6px",
-    marginRight: "10px",
-  },
-  btn: {
-    padding: "10px",
-    background: "#00adb5",
-    color: "white",
     border: "none",
+  },
+
+  compareBtn: {
+    background: "#22c55e",
+    border: "none",
+    padding: "10px 15px",
     borderRadius: "6px",
     cursor: "pointer",
-    marginRight: "10px",
-  },
-  logout: {
-    padding: "10px",
-    background: "#ef4444",
     color: "white",
-    border: "none",
-    borderRadius: "6px",
-    cursor: "pointer",
   },
-  profile: {
-    display: "flex",
-    alignItems: "center",
-    gap: "20px",
-  },
-  avatar: {
-    width: "80px",
-    borderRadius: "50%",
-  },
-  cards: {
-    display: "flex",
-    gap: "20px",
-    marginTop: "20px",
-  },
-  card: {
-    background: "#1e293b",
-    padding: "15px",
-    borderRadius: "10px",
-  },
-  aiBox: {
-    display: "flex",
-    gap: "20px",
-    marginTop: "20px",
-  },
-  chart: {
+
+  resultBox: {
     marginTop: "30px",
   },
-  skill: {
-    marginTop: "10px",
+
+  users: {
+    display: "flex",
+    gap: "20px",
+  },
+
+  card: {
+    background: "#1e293b",
+    padding: "20px",
+    borderRadius: "10px",
+    width: "200px",
+  },
+
+  winner: {
+    marginTop: "20px",
+    fontSize: "20px",
+    color: "#22c55e",
   },
 };
 
-function AppWrapper() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<App />} />
-        
-      </Routes>
-    </BrowserRouter>
-  );
-}
-
-export default AppWrapper;
+export default Compare;

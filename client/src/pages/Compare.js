@@ -8,8 +8,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-// import Login from "../Login";
-// import Signup from "../Signup";
+import Login from "../Login";
+import Signup from "../Signup";
 
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 //import Compare from "./pages/Compare";

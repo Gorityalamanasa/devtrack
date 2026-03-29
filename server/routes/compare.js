@@ -14,18 +14,36 @@ const github = axios.create({
   },
 });
 
-// 🔥 Score calc
+// 🔥 Skill extraction
+const getSkills = (repos) => {
+  const map = {};
+  repos.forEach((repo) => {
+    if (repo.language) {
+      map[repo.language] = (map[repo.language] || 0) + 1;
+    }
+  });
+  return map;
+};
+
+// 🔥 Score calculation
 const calcScore = (user, repos) => {
   const totalStars = repos.reduce(
     (sum, repo) => sum + repo.stargazers_count,
     0
   );
 
-  return (
-    user.followers * 0.4 +
-    user.public_repos * 0.3 +
-    totalStars * 0.3
-  );
+  return {
+    total:
+      user.followers * 0.4 +
+      user.public_repos * 0.3 +
+      totalStars * 0.3,
+    breakdown: {
+      followers: user.followers * 0.4,
+      repos: user.public_repos * 0.3,
+      stars: totalStars * 0.3,
+      totalStars,
+    },
+  };
 };
 
 // 🔥 MULTI USER COMPARE
@@ -39,7 +57,6 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // 🔥 Fetch all users
     const results = await Promise.all(
       users.map(async (username) => {
         const [u, r] = await Promise.all([
@@ -47,13 +64,15 @@ router.post("/", async (req, res) => {
           github.get(`/users/${username}/repos`),
         ]);
 
-        const score = calcScore(u.data, r.data);
+        const scoreData = calcScore(u.data, r.data);
 
         return {
           username,
           followers: u.data.followers,
           repos: u.data.public_repos,
-          score,
+          score: scoreData.total,
+          breakdown: scoreData.breakdown,
+          skills: getSkills(r.data),
         };
       })
     );

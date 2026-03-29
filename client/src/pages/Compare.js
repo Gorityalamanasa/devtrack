@@ -13,98 +13,57 @@ const BASE_URL = "https://devtrack-backend-xmag.onrender.com";
 
 function Compare() {
   const [input, setInput] = useState("");
-  const [usersData, setUsersData] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  // 🔥 Parse input (comma separated)
-  const getUsernames = () => {
-    return input
-      .split(",")
-      .map((u) => u.trim())
-      .filter((u) => u.length > 0);
-  };
+  const [data, setData] = useState([]);
 
   const handleCompare = async () => {
-    const usernames = getUsernames();
+    const users = input.split(",").map((u) => u.trim());
 
-    if (usernames.length < 2) {
-      alert("Enter at least 2 users");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      // 🔥 Fetch all users
-      const results = await Promise.all(
-        usernames.map(async (username) => {
-          const res = await axios.get(
-            `${BASE_URL}/github/${username}`
-          );
-
-          const repos = res.data.repos;
-
-          const totalStars = repos.reduce(
-            (sum, r) => sum + r.stargazers_count,
-            0
-          );
-
-          const score =
-            res.data.user.followers * 0.4 +
-            res.data.user.public_repos * 0.3 +
-            totalStars * 0.3;
-
-          return {
-            username,
-            followers: res.data.user.followers,
-            repos: res.data.user.public_repos,
-            stars: totalStars,
-            score,
-          };
-        })
-      );
-
-      // 🔥 Sort leaderboard
-      results.sort((a, b) => b.score - a.score);
-
-      setUsersData(results);
-    } catch (err) {
-      console.error(err);
-      alert("Error comparing users");
-    } finally {
-      setLoading(false);
-    }
+    const res = await axios.post(`${BASE_URL}/compare`, { users });
+    setData(res.data.leaderboard);
   };
 
-  // 🔥 Chart Data
-  const chartData = usersData.map((u) => ({
+  // 🔥 Score Chart
+  const scoreChart = data.map((u) => ({
     name: u.username,
-    score: u.score,
+    score: Math.round(u.score),
   }));
+
+  // 🔥 Skill Chart (top 3 users only)
+  const skillChart = Object.keys(data[0]?.skills || {}).map((lang) => {
+    const obj = { language: lang };
+    data.slice(0, 3).forEach((u) => {
+      obj[u.username] = u.skills[lang] || 0;
+    });
+    return obj;
+  });
 
   // 🔥 AI Insight
   const getInsight = () => {
-    if (!usersData.length) return "";
+    if (!data.length) return "";
 
-    const top = usersData[0];
-    const bottom = usersData[usersData.length - 1];
+    const top = data[0];
+    const second = data[1];
 
-    return `
-🏆 ${top.username} dominates with highest score.
+    let msg = `🏆 ${top.username} leads because:\n`;
 
-📉 ${bottom.username} needs improvement in activity or impact.
+    if (top.followers > second.followers)
+      msg += "• Strong community (followers)\n";
 
-💡 Tip: Focus on stars + consistency for better ranking.
-    `;
+    if (top.breakdown.totalStars > second.breakdown.totalStars)
+      msg += "• High repo impact (stars)\n";
+
+    if (top.repos > second.repos)
+      msg += "• More active development\n";
+
+    return msg;
   };
 
   return (
     <div style={styles.container}>
       <h1>🔥 Developer Battle Arena</h1>
 
-      {/* INPUT */}
       <input
-        placeholder="Enter usernames (comma separated)"
+        placeholder="Enter users (comma separated)"
         value={input}
         onChange={(e) => setInput(e.target.value)}
         style={styles.input}
@@ -114,14 +73,13 @@ function Compare() {
         Compare 🚀
       </button>
 
-      {loading && <p>Loading...</p>}
-
-      {/* 🔥 CHART */}
-      {usersData.length > 0 && (
+      {/* 🔥 SCORE CHART */}
+      {data.length > 0 && (
         <>
+          <h2>📊 Score Comparison</h2>
           <div style={{ height: 300 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
+            <ResponsiveContainer>
+              <BarChart data={scoreChart}>
                 <XAxis dataKey="name" stroke="#fff" />
                 <YAxis stroke="#fff" />
                 <Tooltip />
@@ -132,13 +90,40 @@ function Compare() {
 
           {/* 🏆 LEADERBOARD */}
           <h2>🏆 Leaderboard</h2>
-          {usersData.map((u, i) => (
+          {data.map((u, i) => (
             <div key={i} style={styles.card}>
-              #{i + 1} {u.username} — Score: {Math.round(u.score)}
+              <h3>
+                #{i + 1} {u.username}
+              </h3>
+              <p>Score: {Math.round(u.score)}</p>
+
+              {/* 🔥 BREAKDOWN */}
+              <p>Followers: {u.followers}</p>
+              <p>Repos: {u.repos}</p>
+              <p>Stars: {u.breakdown.totalStars}</p>
             </div>
           ))}
 
-          {/* 🧠 INSIGHT */}
+          {/* 🔥 SKILL GRAPH */}
+          <h2>💻 Skill Comparison</h2>
+          <div style={{ height: 300 }}>
+            <ResponsiveContainer>
+              <BarChart data={skillChart}>
+                <XAxis dataKey="language" stroke="#fff" />
+                <YAxis stroke="#fff" />
+                <Tooltip />
+                {data.slice(0, 3).map((u, idx) => (
+                  <Bar
+                    key={idx}
+                    dataKey={u.username}
+                    fill={["#22c55e", "#3b82f6", "#f59e0b"][idx]}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* 🧠 AI INSIGHT */}
           <div style={styles.insight}>
             <h3>🧠 AI Insight</h3>
             <pre>{getInsight()}</pre>

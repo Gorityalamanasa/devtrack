@@ -1,175 +1,183 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
-// 🔥 BACKEND URL
 const BASE_URL = "https://devtrack-backend-xmag.onrender.com";
 
 function Compare() {
-  const navigate = useNavigate();
-
-  const [user1, setUser1] = useState("");
-  const [user2, setUser2] = useState("");
-  const [result, setResult] = useState(null);
+  const [input, setInput] = useState("");
+  const [usersData, setUsersData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+
+  // 🔥 Parse input (comma separated)
+  const getUsernames = () => {
+    return input
+      .split(",")
+      .map((u) => u.trim())
+      .filter((u) => u.length > 0);
+  };
 
   const handleCompare = async () => {
-    if (!user1 || !user2) {
-      setError("❌ Enter both usernames");
+    const usernames = getUsernames();
+
+    if (usernames.length < 2) {
+      alert("Enter at least 2 users");
       return;
     }
 
-    try {
-      setLoading(true);
-      setError("");
+    setLoading(true);
 
-      const res = await axios.get(
-        `${BASE_URL}/compare/${user1}/${user2}`
+    try {
+      // 🔥 Fetch all users
+      const results = await Promise.all(
+        usernames.map(async (username) => {
+          const res = await axios.get(
+            `${BASE_URL}/github/${username}`
+          );
+
+          const repos = res.data.repos;
+
+          const totalStars = repos.reduce(
+            (sum, r) => sum + r.stargazers_count,
+            0
+          );
+
+          const score =
+            res.data.user.followers * 0.4 +
+            res.data.user.public_repos * 0.3 +
+            totalStars * 0.3;
+
+          return {
+            username,
+            followers: res.data.user.followers,
+            repos: res.data.user.public_repos,
+            stars: totalStars,
+            score,
+          };
+        })
       );
 
-      setResult(res.data);
+      // 🔥 Sort leaderboard
+      results.sort((a, b) => b.score - a.score);
+
+      setUsersData(results);
     } catch (err) {
       console.error(err);
-      setError("❌ Comparison failed (check usernames)");
+      alert("Error comparing users");
     } finally {
       setLoading(false);
     }
   };
 
+  // 🔥 Chart Data
+  const chartData = usersData.map((u) => ({
+    name: u.username,
+    score: u.score,
+  }));
+
+  // 🔥 AI Insight
+  const getInsight = () => {
+    if (!usersData.length) return "";
+
+    const top = usersData[0];
+    const bottom = usersData[usersData.length - 1];
+
+    return `
+🏆 ${top.username} dominates with highest score.
+
+📉 ${bottom.username} needs improvement in activity or impact.
+
+💡 Tip: Focus on stars + consistency for better ranking.
+    `;
+  };
+
   return (
     <div style={styles.container}>
-      {/* HEADER */}
-      <div style={styles.header}>
-        <h1>Compare Developers ⚔️</h1>
-        <button onClick={() => navigate("/")} style={styles.backBtn}>
-          ← Back
-        </button>
-      </div>
+      <h1>🔥 Developer Battle Arena</h1>
 
-      {/* INPUTS */}
-      <div style={styles.inputBox}>
-        <input
-          placeholder="GitHub Username 1"
-          value={user1}
-          onChange={(e) => setUser1(e.target.value)}
-          style={styles.input}
-        />
+      {/* INPUT */}
+      <input
+        placeholder="Enter usernames (comma separated)"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        style={styles.input}
+      />
 
-        <input
-          placeholder="GitHub Username 2"
-          value={user2}
-          onChange={(e) => setUser2(e.target.value)}
-          style={styles.input}
-        />
+      <button onClick={handleCompare} style={styles.btn}>
+        Compare 🚀
+      </button>
 
-        <button onClick={handleCompare} style={styles.compareBtn}>
-          Compare 🚀
-        </button>
-      </div>
+      {loading && <p>Loading...</p>}
 
-      {/* ERROR */}
-      {error && <p style={{ color: "red" }}>{error}</p>}
-
-      {/* LOADING */}
-      {loading && <p>Comparing...</p>}
-
-      {/* RESULT */}
-      {result && (
-        <div style={styles.resultBox}>
-          {/* USERS */}
-          <div style={styles.users}>
-            <div style={styles.card}>
-              <h2>{result.user1.username}</h2>
-              <p>Followers: {result.user1.followers}</p>
-              <p>Repos: {result.user1.repos}</p>
-              <p>Score: {Math.round(result.user1.score)}</p>
-            </div>
-
-            <div style={styles.card}>
-              <h2>{result.user2.username}</h2>
-              <p>Followers: {result.user2.followers}</p>
-              <p>Repos: {result.user2.repos}</p>
-              <p>Score: {Math.round(result.user2.score)}</p>
-            </div>
+      {/* 🔥 CHART */}
+      {usersData.length > 0 && (
+        <>
+          <div style={{ height: 300 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <XAxis dataKey="name" stroke="#fff" />
+                <YAxis stroke="#fff" />
+                <Tooltip />
+                <Bar dataKey="score" fill="#22c55e" />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
 
-          {/* WINNER */}
-          <div style={styles.winner}>
-            🏆 Winner: <b>{result.winner}</b>
+          {/* 🏆 LEADERBOARD */}
+          <h2>🏆 Leaderboard</h2>
+          {usersData.map((u, i) => (
+            <div key={i} style={styles.card}>
+              #{i + 1} {u.username} — Score: {Math.round(u.score)}
+            </div>
+          ))}
+
+          {/* 🧠 INSIGHT */}
+          <div style={styles.insight}>
+            <h3>🧠 AI Insight</h3>
+            <pre>{getInsight()}</pre>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
 }
 
-/* 🔥 STYLES */
 const styles = {
   container: {
     background: "#0f172a",
-    minHeight: "100vh",
     color: "white",
+    minHeight: "100vh",
     padding: "20px",
   },
-
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "20px",
-  },
-
-  backBtn: {
-    background: "#38bdf8",
-    border: "none",
-    padding: "10px",
-    borderRadius: "6px",
-    cursor: "pointer",
-    color: "white",
-  },
-
-  inputBox: {
-    display: "flex",
-    gap: "10px",
-    marginBottom: "20px",
-  },
-
   input: {
     padding: "10px",
-    borderRadius: "6px",
-    border: "none",
+    width: "400px",
+    marginRight: "10px",
   },
-
-  compareBtn: {
+  btn: {
+    padding: "10px",
     background: "#22c55e",
     border: "none",
-    padding: "10px 15px",
-    borderRadius: "6px",
-    cursor: "pointer",
     color: "white",
   },
-
-  resultBox: {
-    marginTop: "30px",
-  },
-
-  users: {
-    display: "flex",
-    gap: "20px",
-  },
-
   card: {
     background: "#1e293b",
-    padding: "20px",
-    borderRadius: "10px",
-    width: "200px",
+    padding: "10px",
+    marginTop: "10px",
+    borderRadius: "6px",
   },
-
-  winner: {
+  insight: {
     marginTop: "20px",
-    fontSize: "20px",
-    color: "#22c55e",
+    background: "#1e293b",
+    padding: "15px",
+    borderRadius: "10px",
   },
 };
 

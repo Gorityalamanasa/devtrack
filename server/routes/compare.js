@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const axios = require("axios");
+const Comparison = require("../models/Comparison");
+const Leaderboard = require("../models/Leaderboard");
 
 // 🔥 GitHub API
 const github = axios.create({
@@ -25,70 +27,94 @@ const getSkills = (repos) => {
   return map;
 };
 
-// 🔥 Repo Quality Score
+// 🔥 Repo Quality
 const getRepoQuality = (repos) => {
   if (!repos.length) return 0;
 
   const totalStars = repos.reduce((a, r) => a + r.stargazers_count, 0);
-  const totalForks = repos.reduce((a, r) => a + r.forks_count, 0);
-
-  const avgStars = totalStars / repos.length;
-  const avgForks = totalForks / repos.length;
-
-  return avgStars * 0.7 + avgForks * 0.3;
+  return totalStars / repos.length;
 };
 
-// 🔥 Activity Score (recent commits)
+// 🔥 Activity Score
 const getActivityScore = (repos) => {
   const now = new Date();
 
-  const recent = repos.filter((r) => {
-    const updated = new Date(r.updated_at);
-    const diffDays = (now - updated) / (1000 * 60 * 60 * 24);
+  return repos.filter((r) => {
+    const diffDays =
+      (now - new Date(r.updated_at)) / (1000 * 60 * 60 * 24);
     return diffDays < 30;
-  });
-
-  return recent.length;
+  }).length;
 };
 
-// 🔥 Normalized Score
-const calcScore = (user, repos) => {
-  const followersScore = Math.log(user.followers + 1) * 20;
-  const repoQuality = getRepoQuality(repos);
-  const activity = getActivityScore(repos);
+// 🔥 BENCHMARKS (NEW 🔥)
+const getBenchmarks = (usersData) => {
+  const total = usersData.length;
 
-  const total = followersScore + repoQuality * 2 + activity * 5;
+  const avgFollowers =
+    usersData.reduce((sum, u) => sum + u.user.followers, 0) / total;
+
+  const avgRepos =
+    usersData.reduce((sum, u) => sum + u.repos.length, 0) / total;
+
+  const avgStars =
+    usersData.reduce(
+      (sum, u) =>
+        sum +
+        u.repos.reduce((a, r) => a + r.stargazers_count, 0),
+      0
+    ) / total;
+
+  return { avgFollowers, avgRepos, avgStars };
+};
+
+// 🔥 NORMALIZED SCORE (UPDATED 🔥)
+const calcScore = (user, repos, benchmarks) => {
+  const totalStars = repos.reduce((a, r) => a + r.stargazers_count, 0);
+
+  // 🔥 Smooth scaling using tanh (VERY IMPORTANT)
+  const normalize = (value) => Math.tanh(value); // keeps values between 0–1
+
+  const influenceRaw =
+    Math.log(user.followers + 1) /
+    Math.log((benchmarks.avgFollowers || 1) + 1);
+
+  const activityRaw =
+    repos.length / (benchmarks.avgRepos || 1);
+
+  const qualityRaw =
+    totalStars / (benchmarks.avgStars || 1);
+
+  const influence = normalize(influenceRaw) * 35;
+  const activity = normalize(activityRaw) * 25;
+  const quality = normalize(qualityRaw) * 25;
+
+  const total = Math.round(influence + activity + quality);
 
   return {
     total,
     breakdown: {
-      followersScore,
-      repoQuality,
-      activity,
+      influence: Math.round(influence),
+      activity: Math.round(activity),
+      quality: Math.round(quality),
     },
   };
 };
-
 // 🔥 Developer Type
 const classifyDeveloper = (data) => {
-  if (data.followers > 5000) return "Open Source Leader";
-  if (data.repos > 20) return "Consistent Builder";
-  if (data.breakdown.activity > 5) return "Active Developer";
+  const score = data.score;
+
+  if (score >= 80) return "Open Source Leader";
+  if (score >= 60) return "Advanced Developer";
+  if (score >= 40) return "Consistent Builder";
+  if (score >= 20) return "Growing Developer";
   return "Beginner Developer";
 };
-
 // 🔥 Hiring Suggestion
 const getHiringFit = (data) => {
-  if (data.followers > 5000)
-    return "Best for Open Source / Community roles";
-
-  if (data.repos > 15)
-    return "Best for Startup (builder mindset)";
-
-  if (data.breakdown.activity > 5)
-    return "Best for fast-paced teams";
-
-  return "Best for learning / junior roles";
+  if (data.score > 75) return "Best for high-impact engineering teams";
+  if (data.score > 50) return "Best for startups and product teams";
+  if (data.score > 25) return "Best for mid-level roles";
+  return "Best for junior roles";
 };
 
 // 🔥 INSIGHT ENGINE
@@ -96,13 +122,11 @@ const generateInsight = (leaderboard) => {
   const top = leaderboard[0];
   const second = leaderboard[1];
 
+  if (!second) return `${top.username} is leading strongly.`;
+
   return `${top.username} dominates due to strong ${
-    top.followers > second.followers
-      ? "community presence"
-      : "project impact"
-  }, while ${second.username} shows potential in ${
-    second.repos > top.repos ? "building projects" : "growing engagement"
-  }.`;
+    top.score > second.score ? "overall performance" : "consistency"
+  }, while ${second.username} shows growth potential.`;
 };
 
 // 🔥 MAIN API
@@ -110,37 +134,69 @@ router.post("/", async (req, res) => {
   try {
     const { users } = req.body;
 
-    const results = await Promise.all(
+    // ✅ STEP 1: FETCH ALL USERS FIRST
+    const usersData = await Promise.all(
       users.map(async (username) => {
         const [u, r] = await Promise.all([
           github.get(`/users/${username}`),
           github.get(`/users/${username}/repos`),
         ]);
 
-        const scoreData = calcScore(u.data, r.data);
-
-        const userData = {
-          username,
-          followers: u.data.followers,
-          repos: u.data.public_repos,
-          score: scoreData.total,
-          breakdown: scoreData.breakdown,
-          skills: getSkills(r.data),
-        };
-
         return {
-          ...userData,
-          type: classifyDeveloper(userData),
-          hiringFit: getHiringFit(userData),
+          username,
+          user: u.data,
+          repos: r.data,
         };
       })
     );
 
+    // ✅ STEP 2: CREATE BENCHMARKS
+    const benchmarks = getBenchmarks(usersData);
+
+    // ✅ STEP 3: ANALYZE USERS
+    const results = usersData.map(({ username, user, repos }) => {
+      const skills = getSkills(repos);
+
+      const scoreData = calcScore(user, repos, benchmarks);
+
+      return {
+        username,
+        followers: user.followers,
+        repos: user.public_repos,
+        score: scoreData.total,
+        breakdown: scoreData.breakdown,
+        skills,
+        type: classifyDeveloper({ score: scoreData.total }),
+        hiringFit: getHiringFit({ score: scoreData.total }),
+      };
+    });
+
     results.sort((a, b) => b.score - a.score);
+    // 🔥 SAVE COMPARISON HISTORY
+    try {
+    await Comparison.create({
+    users,
+    winner: results[0]?.username,
+    scores: results
+    });
+    } catch (e) {
+    console.log("Comparison save failed:", e.message);
+    }
+    try {
+    for (const user of results) {
+    await Leaderboard.findOneAndUpdate(
+      { username: user.username },
+      { score: user.score, updatedAt: new Date() },
+      { upsert: true }
+    );
+    }
+    } catch (e) {
+    console.log("Leaderboard update failed:", e.message);
+    }
 
     res.json({
       leaderboard: results,
-      winner: results[0].username,
+      winner: results[0]?.username,
       insight: generateInsight(results),
     });
 

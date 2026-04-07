@@ -63,15 +63,23 @@ function Compare() {
     score: Math.round(u.score),
   }));
 
-  const skillChart = Object.keys(data[0]?.skills || {}).map((lang) => {
-    const obj = { language: lang };
+  const allLanguages = new Set();
 
-    data.forEach((u) => {
-      obj[u.username] = u.skills[lang] || 0;
-    });
-
-    return obj;
+data.forEach((u) => {
+  Object.keys(u.skills || {}).forEach((lang) => {
+    allLanguages.add(lang);
   });
+});
+
+const skillChart = Array.from(allLanguages).map((lang) => {
+  const obj = { language: lang };
+
+  data.forEach((u) => {
+    obj[u.username] = u.skills?.[lang] || 0;
+  });
+
+  return obj;
+});
 
   const colors = [
     "#22c55e",
@@ -174,7 +182,7 @@ function Compare() {
           {/* SKILL COMPARISON */}
           <h2>💻 Skill Comparison</h2>
           <div style={{ overflowX: window.innerWidth < 768 ? "auto" : "hidden" }}>
-          <div style={{ width: window.innerWidth < 768 ? "700px" : "100%", height: 300 }}>
+          <div style={{ width: window.innerWidth < 768 ? `${skillChart.length * 120}px` : "100%", height: 300 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={skillChart}>
                   <XAxis dataKey="language" stroke="#fff" />

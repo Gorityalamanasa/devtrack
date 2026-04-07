@@ -28,7 +28,7 @@ function App() {
   const [analysis, setAnalysis] = useState(null);
 
   const [user, setUser] = useState(localStorage.getItem("user"));
-  const [token, setToken] = useState(localStorage.getItem("token"));
+  //const [token, setToken] = useState(localStorage.getItem("token"));
 
   const [searchUser, setSearchUser] = useState("");
   const [activeUser, setActiveUser] = useState(null);

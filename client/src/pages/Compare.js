@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 import axios from "axios";
+import { extractUsername } from "../utils/extractUsername";
+import { useNavigate } from "react-router-dom";
+
 import {
   BarChart,
   Bar,
@@ -10,6 +13,7 @@ import {
 } from "recharts";
 
 const BASE_URL = "https://devtrack-backend-xmag.onrender.com";
+//const BASE_URL = "http://localhost:5000";
 
 function Compare() {
   const [input, setInput] = useState("");
@@ -17,11 +21,22 @@ function Compare() {
   const [insight, setInsight] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate("/");
+  };
+
+  const goDashboard = () => {
+    navigate("/");
+  };
+
   const handleCompare = async () => {
     const users = input
       .split(",")
-      .map((u) => u.trim())
-      .filter(Boolean);
+      .map((u) => extractUsername(u.trim()))
+      .filter((u) => u);
 
     if (users.length < 2) {
       alert("Enter at least 2 usernames");
@@ -43,33 +58,63 @@ function Compare() {
     }
   };
 
-  // 🔥 SCORE CHART
   const scoreChart = data.map((u) => ({
     name: u.username,
     score: Math.round(u.score),
   }));
 
-  // 🔥 SKILL CHART (top 3 users)
   const skillChart = Object.keys(data[0]?.skills || {}).map((lang) => {
     const obj = { language: lang };
-    data.slice(0, 3).forEach((u) => {
+
+    data.forEach((u) => {
       obj[u.username] = u.skills[lang] || 0;
     });
+
     return obj;
   });
 
+  const colors = [
+    "#22c55e",
+    "#3b82f6",
+    "#f59e0b",
+    "#ef4444",
+    "#a855f7",
+    "#14b8a6",
+  ];
+
   return (
     <div style={styles.container}>
-      <h1>🔥 Developer Battle Arena</h1>
+      {/* HEADER */}
+      <div style={styles.header}>
+        <h1>🔥 Developer Battle Arena</h1>
 
-      {/* INPUT */}
+        <div style={styles.headerButtons}>
+          <button onClick={goDashboard} style={styles.dashboardBtn}>
+            🏠 Dashboard
+          </button>
+
+          <button onClick={handleLogout} style={styles.logout}>
+            Logout
+          </button>
+        </div>
+      </div>
+
+      {/* INPUT + CLEAR BUTTON */}
       <div style={styles.inputBox}>
-        <input
-          placeholder="Enter usernames (comma separated)"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          style={styles.input}
-        />
+        <div style={styles.inputWrapper}>
+          <input
+            placeholder="Enter usernames or GitHub URLs (comma separated)"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            style={styles.input}
+          />
+
+          {input && (
+            <button onClick={() => setInput("")} style={styles.clearBtn}>
+              ✕
+            </button>
+          )}
+        </div>
 
         <button onClick={handleCompare} style={styles.btn}>
           Compare 🚀
@@ -80,73 +125,74 @@ function Compare() {
 
       {data.length > 0 && (
         <>
-          {/* 📊 SCORE CHART */}
+          {/* SCORE CHART */}
           <h2>📊 Score Comparison</h2>
-          <div style={{ height: 300 }}>
-            <ResponsiveContainer>
-              <BarChart data={scoreChart}>
-                <XAxis dataKey="name" stroke="#fff" />
-                <YAxis stroke="#fff" />
-                <Tooltip />
-                <Bar dataKey="score" fill="#22c55e" />
-              </BarChart>
-            </ResponsiveContainer>
+          <div style={styles.chartWrapper}>
+            <div style={{ height: 300 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={scoreChart}>
+                  <XAxis dataKey="name" stroke="#fff" />
+                  <YAxis stroke="#fff" />
+                  <Tooltip />
+                  <Bar dataKey="score" fill="#22c55e" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
-          {/* 🏆 LEADERBOARD */}
+          {/* LEADERBOARD */}
           <h2>🏆 Leaderboard</h2>
 
-          {data.map((u, i) => (
-            <div key={i} style={styles.card}>
-              <h3>
-                #{i + 1} {u.username}
-              </h3>
+          <div style={styles.cardGrid}>
+            {data.map((u, i) => (
+              <div key={i} style={styles.card}>
+                <h3>
+                  #{i + 1} {u.username}
+                </h3>
 
-              <p>🔥 Score: {Math.round(u.score)}</p>
+                <p>🔥 Score: {Math.round(u.score)}</p>
 
-              {/* 🔥 BREAKDOWN */}
-              <div style={styles.breakdown}>
-                <p>
-                  Followers Score:{" "}
-                  {u.breakdown.followersScore.toFixed(1)}
-                </p>
-                <p>
-                  Repo Quality:{" "}
-                  {u.breakdown.repoQuality.toFixed(1)}
-                </p>
-                <p>Activity Score: {u.breakdown.activity}</p>
+                <div style={styles.breakdown}>
+                  <p>
+                    Influence: {u.breakdown.influence?.toFixed(1) || 0}
+                  </p>
+                  <p>
+                    Quality: {u.breakdown.quality?.toFixed(1) || 0}
+                  </p>
+                  <p>
+                    Activity: {u.breakdown.activity?.toFixed(1) || 0}
+                  </p>
+                </div>
+
+                <p style={styles.type}>Type: {u.type}</p>
+                <p style={styles.hiring}>💼 {u.hiringFit}</p>
               </div>
-
-              {/* 👨‍💻 TYPE */}
-              <p style={styles.type}>Type: {u.type}</p>
-
-              {/* 🎯 HIRING */}
-              <p style={styles.hiring}>💼 {u.hiringFit}</p>
-            </div>
-          ))}
-
-          {/* 💻 SKILL COMPARISON */}
-          <h2>💻 Skill Comparison</h2>
-          <div style={{ height: 300 }}>
-            <ResponsiveContainer>
-              <BarChart data={skillChart}>
-                <XAxis dataKey="language" stroke="#fff" />
-                <YAxis stroke="#fff" />
-                <Tooltip />
-                {data.slice(0, 3).map((u, idx) => (
-                  <Bar
-                    key={idx}
-                    dataKey={u.username}
-                    fill={
-                      ["#22c55e", "#3b82f6", "#f59e0b"][idx]
-                    }
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
+            ))}
           </div>
 
-          {/* 🧠 AI INSIGHT */}
+          {/* SKILL COMPARISON */}
+          <h2>💻 Skill Comparison</h2>
+          <div style={styles.chartWrapper}>
+            <div style={{ height: 300 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={skillChart}>
+                  <XAxis dataKey="language" stroke="#fff" />
+                  <YAxis stroke="#fff" />
+                  <Tooltip />
+
+                  {data.map((u, idx) => (
+                    <Bar
+                      key={idx}
+                      dataKey={u.username}
+                      fill={colors[idx % colors.length]}
+                    />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* AI INSIGHT */}
           <div style={styles.insight}>
             <h3>🧠 AI Insight</h3>
             <p>{insight}</p>
@@ -157,26 +203,79 @@ function Compare() {
   );
 }
 
-/* 🔥 STYLES */
+/* STYLES */
 const styles = {
   container: {
     background: "#0f172a",
     color: "white",
     minHeight: "100vh",
     padding: "20px",
+    maxWidth: "100vw",
+    overflowX: "hidden",
+  },
+
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "10px",
+  },
+
+  headerButtons: {
+    display: "flex",
+    gap: "10px",
+    flexWrap: "wrap",
+  },
+
+  dashboardBtn: {
+    background: "#22c55e",
+    padding: "10px",
+    border: "none",
+    borderRadius: "6px",
+    color: "white",
+    cursor: "pointer",
+  },
+
+  logout: {
+    background: "#ef4444",
+    padding: "10px",
+    border: "none",
+    borderRadius: "6px",
+    color: "white",
+    cursor: "pointer",
   },
 
   inputBox: {
     display: "flex",
     gap: "10px",
     marginBottom: "20px",
+    flexWrap: "wrap",
+  },
+
+  inputWrapper: {
+    position: "relative",
+    flex: "1",
+    display: "flex",
+    alignItems: "center",
   },
 
   input: {
-    padding: "10px",
-    width: "400px",
+    padding: "10px 35px 10px 10px",
+    flex: "1",
+    minWidth: "0",
     borderRadius: "6px",
     border: "none",
+  },
+
+  clearBtn: {
+    position: "absolute",
+    right: "10px",
+    background: "transparent",
+    border: "none",
+    color: "#94a3b8",
+    fontSize: "16px",
+    cursor: "pointer",
   },
 
   btn: {
@@ -188,11 +287,20 @@ const styles = {
     cursor: "pointer",
   },
 
+  cardGrid: {
+    display: "flex",
+    gap: "15px",
+    flexWrap: "wrap",
+    width: "100%",
+  },
+
   card: {
     background: "#1e293b",
     padding: "15px",
     marginTop: "15px",
     borderRadius: "10px",
+    flex: "1 1 250px",
+    maxWidth: "100%",
   },
 
   breakdown: {
@@ -217,6 +325,11 @@ const styles = {
     background: "#1e293b",
     padding: "20px",
     borderRadius: "10px",
+  },
+
+  chartWrapper: {
+    width: "100%",
+    overflowX: "auto",
   },
 };
 

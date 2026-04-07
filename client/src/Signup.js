@@ -42,8 +42,20 @@ function Signup({ setIsSignup, setUser, setToken }) {
 
       // 👉 Move to login screen
       setIsSignup(false);
+
     } catch (err) {
-      alert(err.response?.data?.error || "Signup failed");
+      const msg =
+        err.response?.data?.msg ||
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        "Signup failed";
+
+      alert(msg);
+
+      if (msg === "User already exists") {
+        setIsSignup(false);
+      }
+
     } finally {
       setLoading(false);
     }
@@ -53,10 +65,10 @@ function Signup({ setIsSignup, setUser, setToken }) {
     <div style={styles.container}>
       <div style={styles.card}>
         <h1 style={styles.title}>DevTrack 🚀</h1>
-        <h2 style={{ marginBottom: "20px", color: "#cbd5f5" }}>
-          Create Account
-        </h2>
 
+        <h2 style={styles.subtitle}>Create Account</h2>
+
+        {/* EMAIL */}
         <input
           placeholder="Email"
           value={email}
@@ -64,6 +76,7 @@ function Signup({ setIsSignup, setUser, setToken }) {
           style={styles.input}
         />
 
+        {/* PASSWORD (ONLY BROWSER EYE) */}
         <input
           type="password"
           placeholder="Password"
@@ -72,6 +85,7 @@ function Signup({ setIsSignup, setUser, setToken }) {
           style={styles.input}
         />
 
+        {/* GITHUB USERNAME */}
         <input
           placeholder="GitHub Username"
           value={githubUsername}
@@ -79,6 +93,7 @@ function Signup({ setIsSignup, setUser, setToken }) {
           style={styles.input}
         />
 
+        {/* BUTTON */}
         <button
           style={styles.button}
           onClick={handleSignup}
@@ -87,6 +102,7 @@ function Signup({ setIsSignup, setUser, setToken }) {
           {loading ? "Creating..." : "Signup"}
         </button>
 
+        {/* LOGIN LINK */}
         <p style={styles.link} onClick={() => setIsSignup(false)}>
           Already have an account? Login
         </p>
@@ -97,26 +113,37 @@ function Signup({ setIsSignup, setUser, setToken }) {
 
 const styles = {
   container: {
-    height: "100vh",
+    minHeight: "100vh",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     background: "#0f172a",
+    padding: "20px",
   },
+
   card: {
     background: "#1e293b",
-    padding: "40px",
+    padding: "30px",
     borderRadius: "16px",
-    width: "340px",
+    width: "100%",
+    maxWidth: "380px",
     textAlign: "center",
     boxShadow: "0 15px 40px rgba(0,0,0,0.6)",
   },
+
   title: {
     marginBottom: "10px",
     color: "#fff",
-    fontSize: "26px",
+    fontSize: "24px",
     fontWeight: "bold",
   },
+
+  subtitle: {
+    marginBottom: "20px",
+    color: "#cbd5f5",
+    fontSize: "18px",
+  },
+
   input: {
     width: "100%",
     padding: "12px",
@@ -126,7 +153,10 @@ const styles = {
     outline: "none",
     background: "#0f172a",
     color: "#fff",
+    fontSize: "14px",
+    boxSizing: "border-box", // ✅ prevents overflow
   },
+
   button: {
     width: "100%",
     padding: "12px",
@@ -137,7 +167,9 @@ const styles = {
     cursor: "pointer",
     marginTop: "10px",
     fontWeight: "bold",
+    fontSize: "15px",
   },
+
   link: {
     marginTop: "15px",
     color: "#38bdf8",

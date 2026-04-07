@@ -92,9 +92,16 @@ router.get("/:username", async (req, res) => {
   try {
     const { username } = req.params;
 
+    const config = {
+    headers: {
+    Authorization: `token ${process.env.GITHUB_TOKEN}`,
+    "User-Agent": "devtrack-app",
+    },
+    };
+
     const [userRes, repoRes] = await Promise.all([
-      axios.get(`https://api.github.com/users/${username}`),
-      axios.get(`https://api.github.com/users/${username}/repos`),
+    axios.get(`https://api.github.com/users/${username}`, config),
+    axios.get(`https://api.github.com/users/${username}/repos`, config),
     ]);
 
     const user = userRes.data;

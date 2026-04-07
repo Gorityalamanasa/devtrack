@@ -10,6 +10,7 @@ const BASE_URL =
 function Login({ setUser, setIsSignup, setToken }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
@@ -70,12 +71,25 @@ function Login({ setUser, setIsSignup, setToken }) {
         />
 
         <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={styles.input}
+        type={showPassword ? "text" : "password"}   // ✅ change here
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        style={styles.input}
         />
+        <div
+        onClick={() => setShowPassword(!showPassword)}
+        style={{
+         color: "#38bdf8",
+        fontSize: "13px",
+        textAlign: "right",
+        cursor: "pointer",
+        marginTop: "-5px",
+        marginBottom: "10px",
+        }}
+        >
+       {showPassword ? "Hide Password" : "Show Password"}
+       </div>
 
         <button
           style={styles.button}

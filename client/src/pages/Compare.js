@@ -260,13 +260,12 @@ const styles = {
     alignItems: "center",
   },
 
-  input: {
-    padding: "10px 35px 10px 10px",
-    flex: "1",
-    minWidth: "0",
-    borderRadius: "6px",
-    border: "none",
-  },
+ input: {
+  padding: "12px 40px 12px 12px",
+  flex: "1",            // ✅ THIS FIXES EVERYTHING
+  minWidth: "0",        // ✅ keep this
+  borderRadius: "8px",
+},
 
   clearBtn: {
     position: "absolute",

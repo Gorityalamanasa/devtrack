@@ -77,7 +77,6 @@ function App() {
     localStorage.clear();
   };
 
-  // 🔥 NEW (activity)
   const isActiveRepo = (repo) => {
     const days =
       (Date.now() - new Date(repo.pushed_at)) /
@@ -215,7 +214,7 @@ function App() {
             <div style={styles.card}><h3>Following</h3><p>{data.user.following}</p></div>
           </div>
 
-          {/* ANALYSIS (UNCHANGED) */}
+          {/* ANALYSIS */}
           {analysis && (
             <>
               <div style={styles.row}>
@@ -257,24 +256,27 @@ function App() {
                 </div>
               </div>
 
-              {/* TIMELINE */}
+              {/* ✅ FIXED TIMELINE SCROLL */}
               <div style={styles.section}>
                 <h2>📈 Growth Timeline</h2>
-                <div style={{ width: "100%", overflowX: "auto" }}>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={analysis?.timeline?.repoGrowth}>
-                      <XAxis dataKey="month" stroke="#94a3b8" />
-                      <YAxis stroke="#94a3b8" />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="count" stroke="#22c55e" strokeWidth={3} />
-                    </LineChart>
-                  </ResponsiveContainer>
+
+                <div style={{ overflowX: isMobile ? "auto" : "hidden" }}>
+                  <div style={{ width: isMobile ? "600px" : "100%" }}>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={analysis?.timeline?.repoGrowth}>
+                        <XAxis dataKey="month" stroke="#94a3b8" />
+                        <YAxis stroke="#94a3b8" />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="count" stroke="#22c55e" strokeWidth={3} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               </div>
             </>
           )}
 
-          {/* ✅ ONLY FIXED MOBILE SCROLL */}
+          {/* REPO OVERVIEW */}
           <div style={styles.section}>
             <h2>Repositories Overview 📊</h2>
 
@@ -298,7 +300,7 @@ function App() {
             </p>
           </div>
 
-          {/* ✅ ONLY FIXED REPO UI */}
+          {/* ✅ FIXED REPO CLICK */}
           <div style={styles.section}>
             <h2>Top Repositories 🚀</h2>
 
@@ -311,11 +313,22 @@ function App() {
                     padding: "15px",
                     borderRadius: "12px",
                     flex: "1 1 200px",
-                    cursor: "pointer",
                   }}
-                  onClick={() => window.open(repo.html_url, "_blank")}
                 >
-                  <h4>{repo.name}</h4>
+                  <h4>
+                    <a
+                      href={repo.html_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: "#60a5fa",
+                        textDecoration: "underline",
+                      }}
+                    >
+                      {repo.name}
+                    </a>
+                  </h4>
+
                   <p>⭐ {repo.stargazers_count} | 🍴 {repo.forks_count}</p>
                   <p style={{ color: "#22c55e" }}>Score: {repo.score}</p>
 
@@ -329,7 +342,7 @@ function App() {
             </div>
           </div>
 
-          {/* TOP SKILLS (UNCHANGED) */}
+          {/* SKILLS */}
           <div style={styles.section}>
             <h2>Top Skills 💻</h2>
             {getSkills().map((s, i) => (

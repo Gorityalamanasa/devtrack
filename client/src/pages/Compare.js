@@ -126,8 +126,8 @@ function Compare() {
       {data.length > 0 && (
         <>
           {/* SCORE CHART */}
-          <h2>📊 Score Comparison</h2>
-          <div style={styles.chartWrapper}>
+          <div style={{ overflowX: window.innerWidth < 768 ? "auto" : "hidden" }}>
+          <div style={{ width: window.innerWidth < 768 ? "600px" : "100%", height: 300 }}>
             <div style={{ height: 300 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={scoreChart}>
@@ -138,6 +138,7 @@ function Compare() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+          </div>
           </div>
 
           {/* LEADERBOARD */}
@@ -172,8 +173,8 @@ function Compare() {
 
           {/* SKILL COMPARISON */}
           <h2>💻 Skill Comparison</h2>
-          <div style={styles.chartWrapper}>
-            <div style={{ height: 300 }}>
+          <div style={{ overflowX: window.innerWidth < 768 ? "auto" : "hidden" }}>
+          <div style={{ width: window.innerWidth < 768 ? "700px" : "100%", height: 300 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={skillChart}>
                   <XAxis dataKey="language" stroke="#fff" />
@@ -189,7 +190,7 @@ function Compare() {
                   ))}
                 </BarChart>
               </ResponsiveContainer>
-            </div>
+          </div>
           </div>
 
           {/* AI INSIGHT */}

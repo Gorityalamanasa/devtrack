@@ -1,58 +1,165 @@
 # 🚀 DevTrack – Developer Productivity Dashboard
 
-🔍 A powerful full-stack web application that analyzes GitHub profiles and provides **actionable insights, performance comparison, and productivity tracking for developers**.
+A full-stack **GitHub Developer Analytics Platform** that helps developers analyze GitHub profiles, compare productivity, and visualize coding activity through an interactive dashboard.
 
 ---
 
 ## 🌐 Live Demo
 
-👉 https://devtrack-242424.vercel.app
+> https://devtrack-242424.vercel.app
 
 ## 📂 GitHub Repository
 
-👉 https://github.com/Gorityalamanasa/devtrack
+> https://github.com/Gorityalamanasa/devtrack
 
 ---
 
-## ✨ Key Highlights
+# 📌 Project Overview
 
-* 📊 Analyze GitHub profiles with real-time data
-* 🧠 AI-like insights to improve developer performance
-* ⚔️ Multi-user comparison system with scoring algorithm
-* 📈 Interactive visualizations using Recharts
-* 🔍 Dynamic search for any GitHub username
-* 📱 Fully responsive UI
+DevTrack analyzes GitHub developer profiles using the GitHub REST API and presents meaningful productivity insights through an interactive dashboard.
 
----
+The application enables users to:
 
-## 🧠 Why This Project Matters
-
-Most developers track progress manually. DevTrack solves this by:
-
-* Providing **data-driven insights**
-* Helping developers understand their **strengths & gaps**
-* Enabling **comparison with other developers** (unique feature 🔥)
+- Analyze any public GitHub profile
+- Compare multiple developers
+- Visualize coding activity
+- Track repository quality and influence
+- Understand overall developer productivity using a weighted scoring algorithm
 
 ---
 
-## 🛠️ Tech Stack
+# ✨ Features
 
-**Frontend:** React.js, Tailwind CSS, Recharts
-**Backend:** Node.js, Express.js
-**Database:** MongoDB
-**API:** GitHub REST API
-**Deployment:** Frontend (Vercel), Backend (Render)
+- 🔐 JWT Authentication
+- 👤 GitHub Profile Analysis
+- 📊 Developer Productivity Dashboard
+- 📈 Interactive Charts using Recharts
+- 🔍 Search Any GitHub Username
+- ⚔️ Compare Multiple Developers
+- 📂 Repository Analysis
+- 🌍 Language Distribution
+- ⭐ Repository Quality & Influence Scoring
+- 📱 Responsive User Interface
 
 ---
 
-## ⚙️ Installation & Setup
+# 🛠️ Tech Stack
+
+## Frontend
+- React.js
+- JavaScript
+- CSS
+- Recharts
+
+## Backend
+- Node.js
+- Express.js
+
+## Database
+- MongoDB
+
+## APIs
+- GitHub REST API
+
+## Authentication
+- JWT (JSON Web Token)
+
+## Deployment
+- Frontend: Vercel
+- Backend: Render
+
+---
+
+# 🏗️ System Workflow
+
+```text
+User Login
+        ↓
+JWT Authentication
+        ↓
+Enter GitHub Username
+        ↓
+Frontend sends API Request
+        ↓
+Backend calls GitHub REST API
+        ↓
+Repository & Profile Data Retrieved
+        ↓
+Developer Score Calculated
+        ↓
+Charts & Insights Generated
+        ↓
+Interactive Dashboard Displayed
+```
+
+---
+
+# 📊 Developer Scoring Algorithm
+
+Developer productivity is calculated using multiple factors:
+
+- Repository Quality
+- Coding Activity
+- Followers & Influence
+- Programming Languages
+- Repository Statistics
+
+These metrics are combined to generate an overall developer productivity score.
+
+---
+
+# 🔐 Authentication Flow
+
+```text
+User Login
+      ↓
+Backend Verifies Credentials
+      ↓
+JWT Token Generated
+      ↓
+Token Stored on Client
+      ↓
+Protected API Requests
+```
+
+---
+
+# 📡 REST API Highlights
+
+- POST `/api/auth/login`
+- POST `/api/auth/register`
+- GET `/api/github/profile/:username`
+- GET `/api/github/compare`
+- GET `/api/dashboard`
+
+---
+
+# 📂 Project Structure
+
+```text
+client/
+├── src/
+├── components/
+├── pages/
+
+server/
+├── controllers/
+├── routes/
+├── middleware/
+├── models/
+├── services/
+├── config/
+```
+
+---
+
+# ⚙️ Installation
 
 ```bash
 git clone https://github.com/Gorityalamanasa/devtrack.git
-cd devtrack
-```
 
-```bash
+cd devtrack
+
 cd client
 npm install
 
@@ -60,32 +167,60 @@ cd ../server
 npm install
 ```
 
+### Start Backend
+
 ```bash
-# Backend
 cd server
 node index.js
+```
 
-# Frontend
+### Start Frontend
+
+```bash
 cd client
 npm start
 ```
 
 ---
 
-## 🔐 Environment Variables
+# 🔑 Environment Variables
 
 ```env
-GITHUB_TOKEN=your_github_token
 PORT=5000
+
+MONGODB_URI=your_mongodb_connection_string
+
+JWT_SECRET=your_jwt_secret
+
+GITHUB_TOKEN=your_github_personal_access_token
 ```
 
 ---
 
+# 📸 Screenshots
 
-## 👨‍💻 Author
+Add screenshots of:
 
-* GitHub: [Gorityalamanasa](https://github.com/Gorityalamanasa)
+- Login Page
+- Dashboard
+- GitHub Profile Analysis
+- Developer Comparison
+- Charts & Analytics
 
 ---
 
-⭐ If you like this project, give it a star!
+# 💡 Future Enhancements
+
+- AI-based code review insights
+- Repository trend prediction
+- Export dashboard reports
+- Team productivity analytics
+- GitHub contribution forecasting
+
+---
+
+# 👨‍💻 Author
+
+**Gorityala Manasa**
+
+If you found this project useful, consider ⭐ starring the repository.

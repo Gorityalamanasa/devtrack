@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 const Search = require("../models/Search");
+const getAIInsights = require("../utils/ai");
 
 const {
   getSkills,
@@ -9,9 +10,8 @@ const {
   getDNA,
   getWeakness,
   getInsights,
-  getDevScore,        // ✅ ADD THIS
+  getDevScore,
 } = require("../utils/analyze");
-
 
 // 🚀 Project Impact
 const getProjectImpact = (repos) => {
@@ -29,7 +29,6 @@ const getProjectImpact = (repos) => {
     mostActive,
   };
 };
-
 
 // 📊 Activity Analytics
 const getActivityAnalytics = (repos) => {
@@ -52,9 +51,6 @@ const getActivityAnalytics = (repos) => {
     level: last7 > 5 ? "High" : last7 > 2 ? "Medium" : "Low",
   };
 };
-
-
-
 
 // 📈 TIMELINE (unchanged)
 const getTimeline = (repos) => {
@@ -86,6 +82,39 @@ const getTimeline = (repos) => {
   };
 };
 
+// ⚖️ Dynamic Benchmark Calculator from DB Search history
+const getDynamicBenchmarks = async () => {
+  const defaults = {
+    avgFollowers: Number(process.env.DEFAULT_AVG_FOLLOWERS) || 100,
+    avgRepos: Number(process.env.DEFAULT_AVG_REPOS) || 20,
+    avgStars: Number(process.env.DEFAULT_AVG_STARS) || 50,
+  };
+
+  try {
+    const stats = await Search.aggregate([
+      {
+        $group: {
+          _id: null,
+          avgFollowers: { $avg: "$followers" },
+          avgRepos: { $avg: "$publicRepos" },
+          avgStars: { $avg: "$totalStars" },
+        },
+      },
+    ]);
+
+    if (stats && stats.length > 0 && stats[0].avgFollowers !== null) {
+      return {
+        avgFollowers: Math.round(stats[0].avgFollowers) || defaults.avgFollowers,
+        avgRepos: Math.round(stats[0].avgRepos) || defaults.avgRepos,
+        avgStars: Math.round(stats[0].avgStars) || defaults.avgStars,
+      };
+    }
+  } catch (err) {
+    console.error("Failed to compute dynamic benchmarks from DB:", err.message);
+  }
+
+  return defaults;
+};
 
 // 🔥 MAIN ROUTE
 router.get("/:username", async (req, res) => {
@@ -93,49 +122,125 @@ router.get("/:username", async (req, res) => {
     const { username } = req.params;
 
     const config = {
-    headers: {
-    Authorization: `token ${process.env.GITHUB_TOKEN}`,
-    "User-Agent": "devtrack-app",
-    },
+      headers: {
+        Authorization: `token ${process.env.GITHUB_TOKEN}`,
+        "User-Agent": "devtrack-app",
+      },
     };
 
     const [userRes, repoRes] = await Promise.all([
-    axios.get(`https://api.github.com/users/${username}`, config),
-    axios.get(`https://api.github.com/users/${username}/repos`, config),
+      axios.get(`https://api.github.com/users/${username}`, config),
+      axios.get(`https://api.github.com/users/${username}/repos`, config),
     ]);
 
     const user = userRes.data;
     const repos = repoRes.data;
 
-    // ✅ ADD THIS (VERY IMPORTANT FIX)
-    const benchmarks = {
-     avgFollowers: 100,
-     avgRepos: 20,
-     avgStars: 50,
-     };
+    // Calculate dynamic benchmarks from search history / config defaults
+    const benchmarks = await getDynamicBenchmarks();
 
-    // existing
+    // Quantitative Calculations (existing deterministic analytics)
     const skills = getSkills(repos);
     const topLanguage = getTopLanguage(skills);
-    const dna = getDNA(skills);
+    const totalStars = repos.reduce((a, r) => a + (r.stargazers_count || 0), 0);
+    const totalForks = repos.reduce((a, r) => a + (r.forks_count || 0), 0);
 
-    // ✅ FIXED (added benchmarks)
-    const weakness = getWeakness(user, repos, benchmarks);
-    const insights = getInsights(user, repos, skills, benchmarks);
-
-    // existing
     const impact = getProjectImpact(repos);
     const activity = getActivityAnalytics(repos);
     const score = getDevScore(user, repos, benchmarks);
     const timeline = getTimeline(repos);
-    // 🔥 SAVE SEARCH HISTORY
+
+    // Rule-based metrics to serve as first-level fallbacks
+    const ruleBasedDna = getDNA(skills);
+    const ruleBasedWeakness = getWeakness(user, repos, benchmarks);
+    const ruleBasedInsights = getInsights(user, repos, skills, benchmarks);
+
+    // Connecting OpenAI with double fallback logic
+    let dna = ruleBasedDna;
+    let weakness = ruleBasedWeakness;
+    let insights = ruleBasedInsights;
+    let aiAvailable = false;
+    let aiSource = "RULE_BASED_FALLBACK";
+
     try {
-    await Search.create({
-    username,
-    score: score.total
-    });
+      const topRepoSimplified = impact.topRepo ? {
+        name: impact.topRepo.name,
+        stars: impact.topRepo.stargazers_count,
+        language: impact.topRepo.language
+      } : null;
+
+      const mostForkedSimplified = impact.mostForked ? {
+        name: impact.mostForked.name,
+        forks: impact.mostForked.forks_count,
+        language: impact.mostForked.language
+      } : null;
+
+      const recentReposSimplified = [...repos]
+        .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+        .slice(0, 3)
+        .map(r => ({
+          name: r.name,
+          description: r.description,
+          updated_at: r.updated_at,
+          language: r.language
+        }));
+
+      const aiResult = await getAIInsights({
+        username,
+        followers: user.followers,
+        publicRepos: repos.length,
+        topLanguage,
+        skills,
+        totalStars,
+        totalForks,
+        activityLevel: activity.level,
+        activityScore: score.activity,
+        influenceScore: score.influence,
+        qualityScore: score.quality,
+        overallScore: score.total,
+        topRepository: topRepoSimplified,
+        mostForkedRepository: mostForkedSimplified,
+        recentRepositories: recentReposSimplified
+      });
+
+      if (aiResult && aiResult.success !== false) {
+        dna = aiResult.dna;
+        weakness = aiResult.weakness;
+        insights = aiResult.insights;
+        aiAvailable = true;
+        aiSource = "OPENAI";
+      } else {
+        console.warn("OpenAI returned a failed result, falling back to rule-based analysis.");
+      }
+    } catch (aiErr) {
+      console.error("Failed to perform OpenAI analysis. Using rule-based fallback.", aiErr.message);
+    }
+
+    // Safety check: ensure dna, weakness, insights are present (Priority 3: generic fallback)
+    if (!dna) {
+      dna = ruleBasedDna || "Data-Driven Developer";
+    }
+    if (!weakness) {
+      weakness = ruleBasedWeakness || "AI analysis is temporarily unavailable.";
+    }
+    if (!insights || !Array.isArray(insights) || insights.length === 0) {
+      insights = (ruleBasedInsights && ruleBasedInsights.length > 0) ? ruleBasedInsights : [
+        "Review repository consistency and recent activity.",
+        "Improve project documentation and visibility."
+      ];
+    }
+
+    // 🔥 SAVE SEARCH HISTORY (with newly tracked stats for future benchmarks)
+    try {
+      await Search.create({
+        username,
+        score: score.total,
+        followers: user.followers,
+        publicRepos: repos.length,
+        totalStars: totalStars
+      });
     } catch (e) {
-    console.log("DB save failed:", e.message);
+      console.log("DB save failed:", e.message);
     }
 
     res.json({
@@ -148,11 +253,13 @@ router.get("/:username", async (req, res) => {
       impact,
       activity,
       score,
-      timeline
+      timeline,
+      aiAvailable,
+      aiSource
     });
 
   } catch (err) {
-    console.error(err.message);
+    console.error("Main analyze route error:", err.message);
     res.status(500).json({ error: "Analysis failed" });
   }
 });

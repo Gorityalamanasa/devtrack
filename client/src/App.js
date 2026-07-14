@@ -217,6 +217,14 @@ function App() {
           {/* ANALYSIS */}
           {analysis && (
             <>
+              <div style={styles.aiBadgeContainer}>
+                {analysis.aiAvailable ? (
+                  <span style={styles.aiBadgeGenerated}>✨ AI Generated</span>
+                ) : (
+                  <span style={styles.aiBadgeFallback}>⚠️ Rule-Based Fallback</span>
+                )}
+              </div>
+
               <div style={styles.row}>
                 <div style={styles.card}>
                   <h3>🧠 Developer DNA</h3>
@@ -406,6 +414,45 @@ const styles = {
   section: { marginTop: "30px", background: "#1e293b", padding: "20px", borderRadius: "12px" },
   skillRow: { display: "flex", justifyContent: "space-between", marginTop: "10px", flexWrap: "wrap" },
   repoGrid: { display: "flex", gap: "15px", flexWrap: "wrap", width: "100%" },
+  aiBadgeContainer: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    marginTop: "25px",
+    gap: "8px",
+  },
+  aiBadgeGenerated: {
+    background: "linear-gradient(135deg, #a855f7 0%, #3b82f6 100%)",
+    padding: "6px 14px",
+    borderRadius: "20px",
+    fontSize: "0.85rem",
+    fontWeight: "bold",
+    letterSpacing: "0.5px",
+    boxShadow: "0 0 10px rgba(168, 85, 247, 0.4)",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "5px",
+    color: "white",
+  },
+  aiBadgeFallback: {
+    background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+    padding: "6px 14px",
+    borderRadius: "20px",
+    fontSize: "0.85rem",
+    fontWeight: "bold",
+    letterSpacing: "0.5px",
+    boxShadow: "0 0 10px rgba(245, 158, 11, 0.3)",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "5px",
+    color: "white",
+  },
+  aiWarningText: {
+    color: "#f59e0b",
+    fontSize: "0.9rem",
+    margin: "4px 0 0 0",
+    fontStyle: "italic",
+  },
 };
 
 export default AppWrapper;

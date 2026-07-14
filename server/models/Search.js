@@ -3,6 +3,9 @@ const mongoose = require("mongoose");
 const searchSchema = new mongoose.Schema({
   username: String,
   score: Number,
+  followers: Number,
+  publicRepos: Number,
+  totalStars: Number,
   searchedAt: { type: Date, default: Date.now }
 });
 

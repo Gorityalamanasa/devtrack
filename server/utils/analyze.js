@@ -92,7 +92,7 @@ const getBenchmarks = (usersData) => {
   );
 
   const totalStars = usersData.reduce(
-    (sum, u) => sum + sum(u.repos, "stargazers_count"),
+    (total, u) => total + sum(u.repos, "stargazers_count"),
     0
   );
 
@@ -150,6 +150,10 @@ const getInsights = (user, repos, skills, benchmarks) => {
 
   if (repos.some((r) => r.forks_count > 20)) {
     insights.push("🍴 Strong collaboration and open-source impact");
+  }
+
+  if (insights.length === 0) {
+    insights.push("🌱 Continue building projects to unlock dynamic insights");
   }
 
   return insights;

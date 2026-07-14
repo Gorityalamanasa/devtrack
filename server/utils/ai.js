@@ -25,6 +25,9 @@ const getAIInsights = async (developerData) => {
     return fallbackResponse;
   }
 
+  const aiUrl = process.env.GITHUB_AI_URL || "https://models.inference.ai.azure.com/chat/completions";
+  const aiModel = process.env.GITHUB_AI_MODEL || "gpt-4o-mini";
+
   const prompt = `
 Analyze the following processed GitHub developer profile metrics:
 - Username: ${developerData.username}
@@ -68,9 +71,9 @@ Desired JSON Format:
 
   const makeAIRequest = async () => {
     return await axios.post(
-      "https://models.inference.ai.azure.com/chat/completions",
+      aiUrl,
       {
-        model: "gpt-4o-mini",
+        model: aiModel,
         messages: [
           {
             role: "system",

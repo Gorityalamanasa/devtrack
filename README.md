@@ -239,15 +239,6 @@ If AI fails, the response automatically returns `"aiAvailable": false` and `"aiS
 
 ---
 
-# 📸 Screenshots
-
-Add screenshots of:
-
-- Login Page
-- Dashboard
-- GitHub Profile Analysis
-- Developer Comparison
-- Charts & Analytics
 
 ---
 

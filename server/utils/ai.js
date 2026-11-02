@@ -1,7 +1,7 @@
 const axios = require("axios");
 
 /**
- * Calls a chat completions endpoint (OpenAI-compatible)
+ * Calls an OpenAI-compatible chat completions endpoint.
  */
 const callChatAPI = async (url, model, apiKey, prompt) => {
   const response = await axios.post(
@@ -13,10 +13,7 @@ const callChatAPI = async (url, model, apiKey, prompt) => {
           role: "system",
           content: "You are a developer productivity analyst. Analyze only the provided GitHub metrics. Return valid JSON only."
         },
-        {
-          role: "user",
-          content: prompt
-        }
+        { role: "user", content: prompt }
       ],
       response_format: { type: "json_object" }
     },
@@ -32,14 +29,12 @@ const callChatAPI = async (url, model, apiKey, prompt) => {
   let content = response.data.choices[0].message.content;
   if (!content) throw new Error("Empty content from AI API");
 
-  // Strip markdown wrappers if present
   content = content.trim()
     .replace(/^```json\s*/i, "")
     .replace(/\s*```$/i, "")
     .trim();
 
   const parsed = JSON.parse(content);
-
   if (!parsed.dna || !parsed.weakness || !Array.isArray(parsed.insights)) {
     throw new Error("Parsed JSON missing required fields");
   }
@@ -53,8 +48,8 @@ const callChatAPI = async (url, model, apiKey, prompt) => {
 };
 
 /**
- * Fetches qualitative analysis (DNA, weaknesses, insights).
- * Tries OpenAI first, then GitHub Models as fallback.
+ * Fetches qualitative AI analysis.
+ * Priority: Gemini (free) → OpenAI → GitHub Models → Rule-based fallback
  */
 const getAIInsights = async (developerData) => {
   const fallbackResponse = {
@@ -88,27 +83,41 @@ Analyze the following processed GitHub developer profile metrics:
 Based strictly on these metrics, generate a qualitative assessment:
 1. "dna": A short developer classification (e.g., "Full-Stack Specialist", "Open Source Collaborator").
 2. "weakness": One meaningful weakness or area for improvement.
-3. "insights": Exactly three concise, professional, and action-oriented insights or improvement suggestions.
+3. "insights": Exactly three concise, professional, and action-oriented insights.
 
 Rules:
-- Keep the response concise, professional, and constructive.
-- Do NOT generate insulting, dismissive, or overly negative feedback.
-- Base all suggestions strictly on the supplied statistics.
-- Return valid JSON only.
+- Keep it concise, professional, and constructive.
+- Base all suggestions strictly on the supplied statistics only.
+- Return valid JSON only in exactly this format:
 
-Desired JSON Format:
 {
   "dna": "...",
   "weakness": "...",
-  "insights": [
-    "Insight 1",
-    "Insight 2",
-    "Insight 3"
-  ]
+  "insights": ["Insight 1", "Insight 2", "Insight 3"]
 }
 `;
 
-  // ── Strategy 1: OpenAI API ──────────────────────────────────────────────
+  // ── Strategy 1: Google Gemini (FREE — recommended) ─────────────────────
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey) {
+    try {
+      console.log("[AI] Trying Gemini...");
+      const result = await callChatAPI(
+        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+        "gemini-1.5-flash",
+        geminiKey,
+        prompt
+      );
+      console.log("[AI] Gemini succeeded ✅");
+      return result;
+    } catch (err) {
+      console.warn("[AI] Gemini failed:", err.response?.status, err.response?.data?.error?.message || err.message);
+    }
+  } else {
+    console.warn("[AI] GEMINI_API_KEY not set.");
+  }
+
+  // ── Strategy 2: OpenAI ─────────────────────────────────────────────────
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
     try {
@@ -125,10 +134,10 @@ Desired JSON Format:
       console.warn("[AI] OpenAI failed:", err.response?.status, err.response?.data?.error?.message || err.message);
     }
   } else {
-    console.warn("[AI] OPENAI_API_KEY not set, skipping OpenAI.");
+    console.warn("[AI] OPENAI_API_KEY not set.");
   }
 
-  // ── Strategy 2: GitHub Models API ──────────────────────────────────────
+  // ── Strategy 3: GitHub Models ──────────────────────────────────────────
   const githubToken = process.env.GITHUB_TOKEN;
   const aiUrl = process.env.GITHUB_AI_URL || "https://models.inference.ai.azure.com/chat/completions";
   const aiModel = process.env.GITHUB_AI_MODEL || "gpt-4o-mini";
@@ -140,27 +149,11 @@ Desired JSON Format:
       console.log("[AI] GitHub Models succeeded ✅");
       return result;
     } catch (err) {
-      console.warn("[AI] GitHub Models failed:", err.response?.status, err.response?.data?.error?.message || err.message);
-
-      // Retry once on rate limit
-      if (err.response?.status === 429) {
-        try {
-          console.log("[AI] Rate limited — retrying in 2s...");
-          await new Promise((r) => setTimeout(r, 2000));
-          const result = await callChatAPI(aiUrl, aiModel, githubToken, prompt);
-          console.log("[AI] GitHub Models retry succeeded ✅");
-          return result;
-        } catch (retryErr) {
-          console.warn("[AI] GitHub Models retry failed:", retryErr.message);
-        }
-      }
+      console.warn("[AI] GitHub Models failed:", err.response?.status, err.message);
     }
-  } else {
-    console.warn("[AI] GITHUB_TOKEN not set, skipping GitHub Models.");
   }
 
-  // ── All strategies failed ───────────────────────────────────────────────
-  console.error("[AI] All AI strategies failed. Using rule-based fallback.");
+  console.error("[AI] All strategies failed. Using rule-based fallback.");
   return fallbackResponse;
 };
 

@@ -2,7 +2,6 @@ const axios = require("axios");
 
 /**
  * Calls an OpenAI-compatible chat completions endpoint.
- * Does NOT use response_format so it works across all providers.
  */
 const callChatAPI = async (url, model, apiKey, prompt) => {
   const response = await axios.post(
@@ -17,21 +16,20 @@ const callChatAPI = async (url, model, apiKey, prompt) => {
         { role: "user", content: prompt }
       ],
       temperature: 0.4,
-      max_tokens: 500
+      max_tokens: 600
     },
     {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json"
       },
-      timeout: 20000
+      timeout: 25000
     }
   );
 
   let content = response.data.choices[0].message.content;
   if (!content) throw new Error("Empty content from AI API");
 
-  // Extract JSON from response (handles markdown wrappers and extra text)
   content = content.trim();
   const jsonMatch = content.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("No JSON found in AI response");
@@ -51,8 +49,7 @@ const callChatAPI = async (url, model, apiKey, prompt) => {
 };
 
 /**
- * Fetches qualitative AI analysis.
- * Priority: Groq → Gemini → OpenAI → GitHub Models → Rule-based fallback
+ * Fetches qualitative AI analysis with multi-provider fallback.
  */
 const getAIInsights = async (developerData) => {
   const fallbackResponse = {
@@ -86,45 +83,36 @@ Return this exact JSON structure:
   "insights": ["insight 1", "insight 2", "insight 3"]
 }`;
 
-  // ── Strategy 1: Groq (FREE — fast) ────────────────────────────────────
+  // ── Strategy 1: Groq — try multiple active models ──────────────────────
   const groqKey = process.env.GROQ_API_KEY;
   if (groqKey) {
-    try {
-      console.log("[AI] Trying Groq...");
-      const result = await callChatAPI(
-        "https://api.groq.com/openai/v1/chat/completions",
-        "llama-3.1-8b-instant",
-        groqKey,
-        prompt
-      );
-      console.log("[AI] Groq succeeded ✅");
-      return result;
-    } catch (err) {
-      console.warn("[AI] Groq failed:", err.response?.status, err.response?.data?.error?.message || err.message);
+    const groqModels = [
+      "llama-3.3-70b-versatile",
+      "llama-3.1-70b-versatile",
+      "gemma2-9b-it",
+      "llama-3.1-8b-instant"
+    ];
+
+    for (const model of groqModels) {
+      try {
+        console.log(`[AI] Trying Groq model: ${model}...`);
+        const result = await callChatAPI(
+          "https://api.groq.com/openai/v1/chat/completions",
+          model,
+          groqKey,
+          prompt
+        );
+        console.log(`[AI] Groq (${model}) succeeded ✅`);
+        return result;
+      } catch (err) {
+        console.warn(`[AI] Groq (${model}) failed:`, err.response?.status, err.response?.data?.error?.message || err.message);
+      }
     }
   } else {
-    console.warn("[AI] GROQ_API_KEY not set.");
+    console.warn("[AI] GROQ_API_KEY not set — skipping Groq.");
   }
 
-  // ── Strategy 2: Google Gemini (free tier) ──────────────────────────────
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (geminiKey) {
-    try {
-      console.log("[AI] Trying Gemini...");
-      const result = await callChatAPI(
-        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-        "gemini-1.5-flash",
-        geminiKey,
-        prompt
-      );
-      console.log("[AI] Gemini succeeded ✅");
-      return result;
-    } catch (err) {
-      console.warn("[AI] Gemini failed:", err.response?.status, err.response?.data?.error?.message || err.message);
-    }
-  }
-
-  // ── Strategy 3: OpenAI ─────────────────────────────────────────────────
+  // ── Strategy 2: OpenAI ─────────────────────────────────────────────────
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
     try {
@@ -140,16 +128,41 @@ Return this exact JSON structure:
     } catch (err) {
       console.warn("[AI] OpenAI failed:", err.response?.status, err.response?.data?.error?.message || err.message);
     }
+  } else {
+    console.warn("[AI] OPENAI_API_KEY not set — skipping OpenAI.");
+  }
+
+  // ── Strategy 3: Google Gemini ──────────────────────────────────────────
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey) {
+    try {
+      console.log("[AI] Trying Gemini...");
+      const result = await callChatAPI(
+        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+        "gemini-1.5-flash",
+        geminiKey,
+        prompt
+      );
+      console.log("[AI] Gemini succeeded ✅");
+      return result;
+    } catch (err) {
+      console.warn("[AI] Gemini failed:", err.response?.status, err.response?.data?.error?.message || err.message);
+    }
+  } else {
+    console.warn("[AI] GEMINI_API_KEY not set — skipping Gemini.");
   }
 
   // ── Strategy 4: GitHub Models ──────────────────────────────────────────
   const githubToken = process.env.GITHUB_TOKEN;
-  const aiUrl = process.env.GITHUB_AI_URL || "https://models.inference.ai.azure.com/chat/completions";
-  const aiModel = process.env.GITHUB_AI_MODEL || "gpt-4o-mini";
   if (githubToken) {
     try {
       console.log("[AI] Trying GitHub Models...");
-      const result = await callChatAPI(aiUrl, aiModel, githubToken, prompt);
+      const result = await callChatAPI(
+        "https://models.inference.ai.azure.com/chat/completions",
+        "gpt-4o-mini",
+        githubToken,
+        prompt
+      );
       console.log("[AI] GitHub Models succeeded ✅");
       return result;
     } catch (err) {

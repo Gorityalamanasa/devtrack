@@ -87,10 +87,9 @@ Return this exact JSON structure:
   const groqKey = process.env.GROQ_API_KEY;
   if (groqKey) {
     const groqModels = [
-      "llama-3.3-70b-versatile",
-      "llama-3.1-70b-versatile",
-      "gemma2-9b-it",
-      "llama-3.1-8b-instant"
+      "openai/gpt-oss-20b",
+      "openai/gpt-oss-120b",
+      "qwen/qwen3.8-27b"
     ];
 
     for (const model of groqModels) {

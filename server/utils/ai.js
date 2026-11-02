@@ -49,7 +49,7 @@ const callChatAPI = async (url, model, apiKey, prompt) => {
 
 /**
  * Fetches qualitative AI analysis.
- * Priority: Gemini (free) → OpenAI → GitHub Models → Rule-based fallback
+ * Priority: Groq (free) → Gemini (free) → OpenAI → GitHub Models → Fallback
  */
 const getAIInsights = async (developerData) => {
   const fallbackResponse = {
@@ -97,7 +97,27 @@ Rules:
 }
 `;
 
-  // ── Strategy 1: Google Gemini (FREE — recommended) ─────────────────────
+  // ── Strategy 1: Groq (FREE — fast, no billing needed) ─────────────────
+  const groqKey = process.env.GROQ_API_KEY;
+  if (groqKey) {
+    try {
+      console.log("[AI] Trying Groq...");
+      const result = await callChatAPI(
+        "https://api.groq.com/openai/v1/chat/completions",
+        "llama3-8b-8192",
+        groqKey,
+        prompt
+      );
+      console.log("[AI] Groq succeeded ✅");
+      return result;
+    } catch (err) {
+      console.warn("[AI] Groq failed:", err.response?.status, err.response?.data?.error?.message || err.message);
+    }
+  } else {
+    console.warn("[AI] GROQ_API_KEY not set.");
+  }
+
+  // ── Strategy 2: Google Gemini (free tier) ──────────────────────────────
   const geminiKey = process.env.GEMINI_API_KEY;
   if (geminiKey) {
     try {
@@ -117,7 +137,7 @@ Rules:
     console.warn("[AI] GEMINI_API_KEY not set.");
   }
 
-  // ── Strategy 2: OpenAI ─────────────────────────────────────────────────
+  // ── Strategy 3: OpenAI ─────────────────────────────────────────────────
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
     try {
@@ -133,15 +153,12 @@ Rules:
     } catch (err) {
       console.warn("[AI] OpenAI failed:", err.response?.status, err.response?.data?.error?.message || err.message);
     }
-  } else {
-    console.warn("[AI] OPENAI_API_KEY not set.");
   }
 
-  // ── Strategy 3: GitHub Models ──────────────────────────────────────────
+  // ── Strategy 4: GitHub Models ──────────────────────────────────────────
   const githubToken = process.env.GITHUB_TOKEN;
   const aiUrl = process.env.GITHUB_AI_URL || "https://models.inference.ai.azure.com/chat/completions";
   const aiModel = process.env.GITHUB_AI_MODEL || "gpt-4o-mini";
-
   if (githubToken) {
     try {
       console.log("[AI] Trying GitHub Models...");

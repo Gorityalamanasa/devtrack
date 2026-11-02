@@ -1,11 +1,60 @@
 const axios = require("axios");
 
 /**
- * Fetches qualitative analysis (DNA, weaknesses, insights) from the free GitHub Models API
- * (running GPT-4o-mini) using the existing GITHUB_TOKEN.
- * 
- * @param {Object} developerData Processed developer statistics
- * @returns {Promise<Object>} Object containing dna, weakness, insights, and a success flag
+ * Calls a chat completions endpoint (OpenAI-compatible)
+ */
+const callChatAPI = async (url, model, apiKey, prompt) => {
+  const response = await axios.post(
+    url,
+    {
+      model,
+      messages: [
+        {
+          role: "system",
+          content: "You are a developer productivity analyst. Analyze only the provided GitHub metrics. Return valid JSON only."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      response_format: { type: "json_object" }
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      timeout: 20000
+    }
+  );
+
+  let content = response.data.choices[0].message.content;
+  if (!content) throw new Error("Empty content from AI API");
+
+  // Strip markdown wrappers if present
+  content = content.trim()
+    .replace(/^```json\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  const parsed = JSON.parse(content);
+
+  if (!parsed.dna || !parsed.weakness || !Array.isArray(parsed.insights)) {
+    throw new Error("Parsed JSON missing required fields");
+  }
+
+  return {
+    success: true,
+    dna: parsed.dna,
+    weakness: parsed.weakness,
+    insights: parsed.insights.slice(0, 3)
+  };
+};
+
+/**
+ * Fetches qualitative analysis (DNA, weaknesses, insights).
+ * Tries OpenAI first, then GitHub Models as fallback.
  */
 const getAIInsights = async (developerData) => {
   const fallbackResponse = {
@@ -17,16 +66,6 @@ const getAIInsights = async (developerData) => {
       "Improve project documentation and visibility."
     ]
   };
-
-  // Authenticate using the existing GITHUB_TOKEN in your environment (Free inference tier)
-  const apiKey = process.env.GITHUB_TOKEN;
-  if (!apiKey) {
-    console.warn("GITHUB_TOKEN is missing. Skipping AI insights.");
-    return fallbackResponse;
-  }
-
-  const aiUrl = process.env.GITHUB_AI_URL || "https://models.inference.ai.azure.com/chat/completions";
-  const aiModel = process.env.GITHUB_AI_MODEL || "gpt-4o-mini";
 
   const prompt = `
 Analyze the following processed GitHub developer profile metrics:
@@ -54,8 +93,8 @@ Based strictly on these metrics, generate a qualitative assessment:
 Rules:
 - Keep the response concise, professional, and constructive.
 - Do NOT generate insulting, dismissive, or overly negative feedback.
-- Base all suggestions strictly on the supplied statistics. Do NOT invent repositories, skills, achievements, or experience.
-- Return valid JSON only, using the specified format.
+- Base all suggestions strictly on the supplied statistics.
+- Return valid JSON only.
 
 Desired JSON Format:
 {
@@ -69,86 +108,60 @@ Desired JSON Format:
 }
 `;
 
-  const makeAIRequest = async () => {
-    return await axios.post(
-      aiUrl,
-      {
-        model: aiModel,
-        messages: [
-          {
-            role: "system",
-            content: "You are a developer productivity analyst. Analyze only the provided GitHub metrics. Return valid JSON only."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        response_format: { type: "json_object" }
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json"
-        },
-        timeout: 15000 // 15-second timeout
-      }
-    );
-  };
-
-  try {
-    let response;
+  // ── Strategy 1: OpenAI API ──────────────────────────────────────────────
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (openaiKey) {
     try {
-      response = await makeAIRequest();
+      console.log("[AI] Trying OpenAI...");
+      const result = await callChatAPI(
+        "https://api.openai.com/v1/chat/completions",
+        "gpt-3.5-turbo",
+        openaiKey,
+        prompt
+      );
+      console.log("[AI] OpenAI succeeded ✅");
+      return result;
     } catch (err) {
-      // Retry once for HTTP 429 (Rate Limit) after a short delay
-      if (err.response && err.response.status === 429) {
-        const errCode = err.response.data?.error?.code;
-        if (errCode === "insufficient_quota") {
-          console.warn("Inference billing quota exceeded. Skipping retry.");
-          throw err;
+      console.warn("[AI] OpenAI failed:", err.response?.status, err.response?.data?.error?.message || err.message);
+    }
+  } else {
+    console.warn("[AI] OPENAI_API_KEY not set, skipping OpenAI.");
+  }
+
+  // ── Strategy 2: GitHub Models API ──────────────────────────────────────
+  const githubToken = process.env.GITHUB_TOKEN;
+  const aiUrl = process.env.GITHUB_AI_URL || "https://models.inference.ai.azure.com/chat/completions";
+  const aiModel = process.env.GITHUB_AI_MODEL || "gpt-4o-mini";
+
+  if (githubToken) {
+    try {
+      console.log("[AI] Trying GitHub Models...");
+      const result = await callChatAPI(aiUrl, aiModel, githubToken, prompt);
+      console.log("[AI] GitHub Models succeeded ✅");
+      return result;
+    } catch (err) {
+      console.warn("[AI] GitHub Models failed:", err.response?.status, err.response?.data?.error?.message || err.message);
+
+      // Retry once on rate limit
+      if (err.response?.status === 429) {
+        try {
+          console.log("[AI] Rate limited — retrying in 2s...");
+          await new Promise((r) => setTimeout(r, 2000));
+          const result = await callChatAPI(aiUrl, aiModel, githubToken, prompt);
+          console.log("[AI] GitHub Models retry succeeded ✅");
+          return result;
+        } catch (retryErr) {
+          console.warn("[AI] GitHub Models retry failed:", retryErr.message);
         }
-        console.warn("AI model rate limit hit (429). Retrying in 1.5 seconds...");
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        response = await makeAIRequest();
-      } else {
-        throw err;
       }
     }
-
-    let content = response.data.choices[0].message.content;
-    if (!content) {
-      throw new Error("Received empty content from AI API");
-    }
-
-    // Clean any markdown wrapper formatting (e.g. ```json ... ```)
-    content = content.trim();
-    if (content.startsWith("```json")) {
-      content = content.replace(/^```json\s*/i, "");
-    }
-    if (content.endsWith("```")) {
-      content = content.replace(/\s*```$/i, "");
-    }
-    content = content.trim();
-
-    const parsed = JSON.parse(content);
-
-    // Validate structure
-    if (!parsed.dna || !parsed.weakness || !Array.isArray(parsed.insights)) {
-      throw new Error("Parsed JSON response is missing required fields");
-    }
-
-    return {
-      success: true,
-      dna: parsed.dna,
-      weakness: parsed.weakness,
-      insights: parsed.insights.slice(0, 3)
-    };
-
-  } catch (err) {
-    console.error("AI utility error:", err.message);
-    return fallbackResponse;
+  } else {
+    console.warn("[AI] GITHUB_TOKEN not set, skipping GitHub Models.");
   }
+
+  // ── All strategies failed ───────────────────────────────────────────────
+  console.error("[AI] All AI strategies failed. Using rule-based fallback.");
+  return fallbackResponse;
 };
 
 module.exports = getAIInsights;

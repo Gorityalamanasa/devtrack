@@ -2,6 +2,7 @@ const axios = require("axios");
 
 /**
  * Calls an OpenAI-compatible chat completions endpoint.
+ * Does NOT use response_format so it works across all providers.
  */
 const callChatAPI = async (url, model, apiKey, prompt) => {
   const response = await axios.post(
@@ -11,11 +12,12 @@ const callChatAPI = async (url, model, apiKey, prompt) => {
       messages: [
         {
           role: "system",
-          content: "You are a developer productivity analyst. Analyze only the provided GitHub metrics. Return valid JSON only."
+          content: "You are a developer productivity analyst. Analyze only the provided GitHub metrics. Return valid JSON only, no extra text."
         },
         { role: "user", content: prompt }
       ],
-      response_format: { type: "json_object" }
+      temperature: 0.4,
+      max_tokens: 500
     },
     {
       headers: {
@@ -29,10 +31,11 @@ const callChatAPI = async (url, model, apiKey, prompt) => {
   let content = response.data.choices[0].message.content;
   if (!content) throw new Error("Empty content from AI API");
 
-  content = content.trim()
-    .replace(/^```json\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
+  // Extract JSON from response (handles markdown wrappers and extra text)
+  content = content.trim();
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("No JSON found in AI response");
+  content = jsonMatch[0];
 
   const parsed = JSON.parse(content);
   if (!parsed.dna || !parsed.weakness || !Array.isArray(parsed.insights)) {
@@ -49,7 +52,7 @@ const callChatAPI = async (url, model, apiKey, prompt) => {
 
 /**
  * Fetches qualitative AI analysis.
- * Priority: Groq (free) → Gemini (free) → OpenAI → GitHub Models → Fallback
+ * Priority: Groq → Gemini → OpenAI → GitHub Models → Rule-based fallback
  */
 const getAIInsights = async (developerData) => {
   const fallbackResponse = {
@@ -62,49 +65,35 @@ const getAIInsights = async (developerData) => {
     ]
   };
 
-  const prompt = `
-Analyze the following processed GitHub developer profile metrics:
+  const prompt = `Analyze this GitHub developer profile and return ONLY a JSON object (no extra text):
+
 - Username: ${developerData.username}
 - Followers: ${developerData.followers}
 - Public Repositories: ${developerData.publicRepos}
 - Primary Language: ${developerData.topLanguage}
-- Top Skills & Language distribution: ${JSON.stringify(developerData.skills)}
+- Skills: ${JSON.stringify(developerData.skills)}
 - Total Stars: ${developerData.totalStars}
 - Total Forks: ${developerData.totalForks}
 - Activity Level: ${developerData.activityLevel}
-- Activity Score: ${developerData.activityScore}/30
-- Influence Score: ${developerData.influenceScore}/40
-- Repository Quality Score: ${developerData.qualityScore}/30
-- Overall Developer Score: ${developerData.overallScore}/100
+- Overall Score: ${developerData.overallScore}/100
 - Top Repository: ${JSON.stringify(developerData.topRepository)}
-- Most Forked Repository: ${JSON.stringify(developerData.mostForkedRepository)}
 - Recent Repositories: ${JSON.stringify(developerData.recentRepositories)}
 
-Based strictly on these metrics, generate a qualitative assessment:
-1. "dna": A short developer classification (e.g., "Full-Stack Specialist", "Open Source Collaborator").
-2. "weakness": One meaningful weakness or area for improvement.
-3. "insights": Exactly three concise, professional, and action-oriented insights.
-
-Rules:
-- Keep it concise, professional, and constructive.
-- Base all suggestions strictly on the supplied statistics only.
-- Return valid JSON only in exactly this format:
-
+Return this exact JSON structure:
 {
-  "dna": "...",
-  "weakness": "...",
-  "insights": ["Insight 1", "Insight 2", "Insight 3"]
-}
-`;
+  "dna": "short developer type label",
+  "weakness": "one specific weakness based on the data",
+  "insights": ["insight 1", "insight 2", "insight 3"]
+}`;
 
-  // ── Strategy 1: Groq (FREE — fast, no billing needed) ─────────────────
+  // ── Strategy 1: Groq (FREE — fast) ────────────────────────────────────
   const groqKey = process.env.GROQ_API_KEY;
   if (groqKey) {
     try {
       console.log("[AI] Trying Groq...");
       const result = await callChatAPI(
         "https://api.groq.com/openai/v1/chat/completions",
-        "llama3-8b-8192",
+        "mixtral-8x7b-32768",
         groqKey,
         prompt
       );
@@ -133,8 +122,6 @@ Rules:
     } catch (err) {
       console.warn("[AI] Gemini failed:", err.response?.status, err.response?.data?.error?.message || err.message);
     }
-  } else {
-    console.warn("[AI] GEMINI_API_KEY not set.");
   }
 
   // ── Strategy 3: OpenAI ─────────────────────────────────────────────────

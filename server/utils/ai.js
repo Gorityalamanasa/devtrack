@@ -93,7 +93,7 @@ Return this exact JSON structure:
       console.log("[AI] Trying Groq...");
       const result = await callChatAPI(
         "https://api.groq.com/openai/v1/chat/completions",
-        "mixtral-8x7b-32768",
+        "llama3-8b-8192",
         groqKey,
         prompt
       );

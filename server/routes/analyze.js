@@ -23,24 +23,17 @@ const getProjectImpact = (repos) => {
     (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
   )[0];
 
-  return {
-    topRepo,
-    mostForked,
-    mostActive,
-  };
+  return { topRepo, mostForked, mostActive };
 };
 
 // 📊 Activity Analytics
 const getActivityAnalytics = (repos) => {
   const now = new Date();
-
   let last7 = 0;
   let last30 = 0;
 
   repos.forEach((repo) => {
-    const diffDays =
-      (now - new Date(repo.updated_at)) / (1000 * 60 * 60 * 24);
-
+    const diffDays = (now - new Date(repo.updated_at)) / (1000 * 60 * 60 * 24);
     if (diffDays <= 7) last7++;
     if (diffDays <= 30) last30++;
   });
@@ -52,37 +45,30 @@ const getActivityAnalytics = (repos) => {
   };
 };
 
-// 📈 TIMELINE (unchanged)
+// 📈 TIMELINE
 const getTimeline = (repos) => {
   if (!repos || repos.length === 0) return { repoGrowth: [] };
 
   const map = {};
-
   repos.forEach((repo) => {
     if (!repo.created_at) return;
-
     const date = new Date(repo.created_at);
     const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
-
     map[key] = (map[key] || 0) + 1;
   });
 
   const sorted = Object.keys(map).sort();
-
   let cumulative = 0;
 
   return {
     repoGrowth: sorted.map((key) => {
       cumulative += map[key];
-      return {
-        month: key,
-        count: cumulative,
-      };
+      return { month: key, count: cumulative };
     }),
   };
 };
 
-// ⚖️ Dynamic Benchmark Calculator from DB Search history
+// ⚖️ Dynamic Benchmark Calculator
 const getDynamicBenchmarks = async () => {
   const defaults = {
     avgFollowers: Number(process.env.DEFAULT_AVG_FOLLOWERS) || 100,
@@ -130,16 +116,14 @@ router.get("/:username", async (req, res) => {
 
     const [userRes, repoRes] = await Promise.all([
       axios.get(`https://api.github.com/users/${username}`, config),
-      axios.get(`https://api.github.com/users/${username}/repos`, config),
+      axios.get(`https://api.github.com/users/${username}/repos?per_page=100`, config),
     ]);
 
     const user = userRes.data;
     const repos = repoRes.data;
 
-    // Calculate dynamic benchmarks from search history / config defaults
     const benchmarks = await getDynamicBenchmarks();
 
-    // Quantitative Calculations (existing deterministic analytics)
     const skills = getSkills(repos);
     const topLanguage = getTopLanguage(skills);
     const totalStars = repos.reduce((a, r) => a + (r.stargazers_count || 0), 0);
@@ -150,12 +134,11 @@ router.get("/:username", async (req, res) => {
     const score = getDevScore(user, repos, benchmarks);
     const timeline = getTimeline(repos);
 
-    // Rule-based metrics to serve as first-level fallbacks
+    // Rule-based fallbacks
     const ruleBasedDna = getDNA(skills);
     const ruleBasedWeakness = getWeakness(user, repos, benchmarks);
     const ruleBasedInsights = getInsights(user, repos, skills, benchmarks);
 
-    // Connecting OpenAI with double fallback logic
     let dna = ruleBasedDna;
     let weakness = ruleBasedWeakness;
     let insights = ruleBasedInsights;
@@ -203,41 +186,38 @@ router.get("/:username", async (req, res) => {
         recentRepositories: recentReposSimplified
       });
 
-      if (aiResult && aiResult.success !== false) {
+      if (aiResult && aiResult.success === true) {
         dna = aiResult.dna;
         weakness = aiResult.weakness;
         insights = aiResult.insights;
         aiAvailable = true;
-        aiSource = "OPENAI";
+        aiSource = "AI_GENERATED";
+        console.log("[Analyze] AI analysis used successfully ✅");
       } else {
-        console.warn("OpenAI returned a failed result, falling back to rule-based analysis.");
+        console.warn("[Analyze] AI returned failed result, using rule-based.");
       }
     } catch (aiErr) {
-      console.error("Failed to perform OpenAI analysis. Using rule-based fallback.", aiErr.message);
+      console.error("[Analyze] AI analysis threw error:", aiErr.message);
     }
 
-    // Safety check: ensure dna, weakness, insights are present (Priority 3: generic fallback)
-    if (!dna) {
-      dna = ruleBasedDna || "Data-Driven Developer";
-    }
-    if (!weakness) {
-      weakness = ruleBasedWeakness || "AI analysis is temporarily unavailable.";
-    }
+    // Safety fallbacks
+    if (!dna) dna = ruleBasedDna || "Data-Driven Developer";
+    if (!weakness) weakness = ruleBasedWeakness || "Keep building and improving visibility.";
     if (!insights || !Array.isArray(insights) || insights.length === 0) {
-      insights = (ruleBasedInsights && ruleBasedInsights.length > 0) ? ruleBasedInsights : [
+      insights = ruleBasedInsights && ruleBasedInsights.length > 0 ? ruleBasedInsights : [
         "Review repository consistency and recent activity.",
         "Improve project documentation and visibility."
       ];
     }
 
-    // 🔥 SAVE SEARCH HISTORY (with newly tracked stats for future benchmarks)
+    // Save search history
     try {
       await Search.create({
         username,
         score: score.total,
         followers: user.followers,
         publicRepos: repos.length,
-        totalStars: totalStars
+        totalStars
       });
     } catch (e) {
       console.log("DB save failed:", e.message);
